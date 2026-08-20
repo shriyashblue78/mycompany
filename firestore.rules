@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to get current user profile
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Helper checking if user is logged in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Helper verifying that the request belongs to the user's company
+    function isSameCompany(companyId) {
+      return isSignedIn() && getUserData().companyId == companyId;
+    }
+
+    // Helper verifying user roles
+    function hasRole(role) {
+      return isSignedIn() && getUserData().role == role;
+    }
+
+    function isOwner(companyId) {
+      return isSameCompany(companyId) && hasRole('Owner');
+    }
+
+    function isHROrSupervisor(companyId) {
+      return isSameCompany(companyId) && (hasRole('HR') || hasRole('Supervisor'));
+    }
+
+    // Users Collection (Used for authentication profile lookup)
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == uid || getUserData().role == 'Owner' || getUserData().role == 'HR');
+    }
+
+    // Companies Collection
+    match /companies/{companyId} {
+      // Owner has full read/write access to their company
+      allow read, write: if isOwner(companyId);
+      
+      // Employees Subcollection
+      match /employees/{employeeId} {
+        // Owner and HR/Supervisors can manage all employees in their company
+        allow read, write: if isOwner(companyId) || isHROrSupervisor(companyId);
+        // Individual employees can only view their own employee record
+        allow read: if isSameCompany(companyId) && getUserData().employeeId == employeeId;
+      }
+      
+      // Attendance Subcollection
+      match /attendance/{attendanceId} {
+        allow read, write: if isOwner(companyId) || isHROrSupervisor(companyId);
+        allow read: if isSameCompany(companyId) && resource.data.employeeId == getUserData().employeeId;
+        allow create: if isSameCompany(companyId) && request.resource.data.employeeId == getUserData().employeeId;
+        allow update: if isSameCompany(companyId) && resource.data.employeeId == getUserData().employeeId;
+      }
+
+      // Leave Requests Subcollection
+      match /leaveRequests/{requestId} {
+        allow read, write: if isOwner(companyId) || isHROrSupervisor(companyId);
+        allow read: if isSameCompany(companyId) && resource.data.employeeId == getUserData().employeeId;
+        allow create: if isSameCompany(companyId) && request.resource.data.employeeId == getUserData().employeeId;
+        allow update: if isSameCompany(companyId) && resource.data.employeeId == getUserData().employeeId;
+      }
+
+      // Drawings Subcollection
+      match /drawings/{drawingId} {
+        allow read, write: if isOwner(companyId) || (isSameCompany(companyId) && hasRole('HR'));
+        allow read: if isSameCompany(companyId) && hasRole('Supervisor');
+      }
+
+      // Other business data subcollections (tasks, inventory, etc.)
+      match /{document=**} {
+        allow read, write: if isOwner(companyId);
+        allow read: if isSameCompany(companyId) && (request.path.size() <= 5 || request.path[5] != 'drawings'); // General business data readable by employees
+      }
+    }
+  }
+}
