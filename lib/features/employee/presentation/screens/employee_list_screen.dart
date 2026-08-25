@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../core/widgets/erp_drawer.dart';
 import '../../../../core/widgets/mobile_widgets.dart';
 import '../../../../core/widgets/responsive_widgets.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/domain/models/company_model.dart';
 import '../../domain/models/employee_model.dart';
 import '../providers/employee_provider.dart';
 
@@ -16,6 +19,7 @@ class EmployeeListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final employeesAsync = ref.watch(filteredEmployeesProvider);
+    final countAsync = ref.watch(activeEmployeesCountProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -25,6 +29,15 @@ class EmployeeListScreen extends ConsumerWidget {
     final selectedRole = ref.watch(employeeRoleFilterProvider);
     final selectedStatus = ref.watch(employeeStatusFilterProvider);
     final limit = ref.watch(employeeLimitProvider);
+
+    // Auth state for company limit & role check
+    final authState = ref.watch(authProvider);
+    final companyAsync = ref.watch(currentCompanyStreamProvider);
+    final company = companyAsync.value;
+    final maxEmployees = company?.maxEmployees ?? 50;
+    final currentCount = countAsync.value ?? 0;
+    final role = authState.selectedRole ?? 'Employee';
+    final isLimitReached = currentCount >= maxEmployees;
 
     return ResponsiveScaffold(
       appBar: AppBar(
@@ -43,17 +56,20 @@ class EmployeeListScreen extends ConsumerWidget {
       ),
       drawer: const ERPDrawer(),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/employees/add'),
+        onPressed: isLimitReached ? null : () => context.push('/employees/add'),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Employee'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: isLimitReached ? theme.disabledColor : theme.colorScheme.primary,
+        foregroundColor: isLimitReached ? theme.disabledColor.withAlpha(128) : Colors.white,
       ),
       body: SafeArea(
         child: Column(
           children: [
             // Search and Filter Panel
             _buildSearchFilterPanel(context, ref, isDark),
+
+            // Seat usage & request panel
+            _buildSeatUsagePanel(context, ref, currentCount, company, role, theme, isDark),
             
             // Employee List / Grid
             Expanded(
@@ -87,7 +103,7 @@ class EmployeeListScreen extends ConsumerWidget {
                   ),
                   data: (employees) {
                     if (employees.isEmpty) {
-                      return _buildEmptyState(context, ref, searchQuery, selectedDept, selectedRole, selectedStatus);
+                      return _buildEmptyState(context, ref, searchQuery, selectedDept, selectedRole, selectedStatus, isLimitReached);
                     }
                     return _buildResponsiveList(context, ref, employees, limit);
                   },
@@ -97,6 +113,381 @@ class EmployeeListScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSeatUsagePanel(
+    BuildContext context,
+    WidgetRef ref,
+    int currentCount,
+    CompanyModel? company,
+    String role,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    if (company == null) return const SizedBox.shrink();
+
+    final maxEmployees = company.maxEmployees;
+    final isLimitReached = currentCount >= maxEmployees;
+    final isOwner = role == 'Owner';
+
+    // Calculate percentage
+    final double percent = (maxEmployees > 0) ? (currentCount / maxEmployees).clamp(0.0, 1.0) : 0.0;
+    final color = isLimitReached
+        ? AppColors.error
+        : percent > 0.8
+            ? AppColors.warning
+            : theme.colorScheme.primary;
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: AppSizes.maxContentWidth),
+        padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                side: BorderSide(
+                  color: isLimitReached
+                      ? AppColors.error.withOpacity(0.3)
+                      : theme.dividerColor.withAlpha(20),
+                ),
+              ),
+              color: isLimitReached
+                  ? AppColors.error.withOpacity(0.04)
+                  : isDark
+                      ? theme.colorScheme.surface
+                      : Colors.grey.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.p16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: Icon, Seats label, Request button
+                    Row(
+                      children: [
+                        Icon(Icons.airline_seat_recline_normal_rounded, color: color, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Employee Seats: ',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '$currentCount / $maxEmployees occupied',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isOwner)
+                          _buildOwnerRequestButton(context, ref, company, theme),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Row 2: Progress indicator
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: percent,
+                        backgroundColor: isDark ? Colors.white10 : Colors.grey.shade200,
+                        color: color,
+                        minHeight: 8,
+                      ),
+                    ),
+                    
+                    // Row 3: Pending or Rejected notice
+                    if (company.requestStatus != null) ...[
+                      const SizedBox(height: 10),
+                      _buildRequestStatusBanner(context, ref, company, theme),
+                    ],
+
+                    // Row 4: Error Block when limit is reached
+                    if (isLimitReached) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                          border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Employee limit reached. Please contact the Main Admin to increase your seat limit.',
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOwnerRequestButton(
+    BuildContext context,
+    WidgetRef ref,
+    CompanyModel company,
+    ThemeData theme,
+  ) {
+    final status = company.requestStatus;
+    
+    // Only allow requesting if no pending request is active
+    if (status == 'pending') {
+      return const SizedBox.shrink();
+    }
+
+    return TextButton.icon(
+      onPressed: () => _showSeatRequestDialog(context, company),
+      icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+      label: const Text('Request Seats', style: TextStyle(fontWeight: FontWeight.bold)),
+      style: TextButton.styleFrom(
+        foregroundColor: theme.colorScheme.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      ),
+    );
+  }
+
+  Widget _buildRequestStatusBanner(
+    BuildContext context,
+    WidgetRef ref,
+    CompanyModel company,
+    ThemeData theme,
+  ) {
+    final status = company.requestStatus;
+    final count = company.requestedSeats ?? 0;
+    final requestedLimit = company.requestNewLimit ?? 0;
+
+    if (status == 'pending') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.amber.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.amber.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.hourglass_empty_rounded, color: Colors.amber, size: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Requested +$count seats (Total $requestedLimit requested - Pending approval)',
+                style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'rejected') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.error.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cancel_outlined, color: AppColors.error, size: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Your request for +$count seats was rejected.',
+                style: const TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                // Clear rejection status to allow fresh input
+                FirebaseFirestore.instance
+                    .collection('companies')
+                    .doc(company.companyId)
+                    .update({
+                  'requestStatus': null,
+                  'requestedSeats': null,
+                  'requestCurrentLimit': null,
+                  'requestNewLimit': null,
+                });
+              },
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Request Again',
+                style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'approved') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.success.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.success.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 14),
+            const SizedBox(width: 6),
+            const Expanded(
+              child: Text(
+                'Your request for additional seats has been approved!',
+                style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                // Dismiss approval banner by clearing status
+                FirebaseFirestore.instance
+                    .collection('companies')
+                    .doc(company.companyId)
+                    .update({
+                  'requestStatus': null,
+                  'requestedSeats': null,
+                  'requestCurrentLimit': null,
+                  'requestNewLimit': null,
+                });
+              },
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Dismiss',
+                style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  void _showSeatRequestDialog(BuildContext context, CompanyModel company) {
+    final controller = TextEditingController(text: '5');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final addition = int.tryParse(controller.text) ?? 0;
+            final currentLimit = company.maxEmployees;
+            final newLimit = currentLimit + addition;
+
+            return AlertDialog(
+              title: const Text('Request Seat Increase'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Current Limit: $currentLimit employees'),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Additional Seats Needed',
+                        prefixIcon: Icon(Icons.add_circle_outline_rounded),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) {
+                        setState(() {});
+                      },
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Enter number of seats';
+                        }
+                        final num = int.tryParse(val.trim());
+                        if (num == null || num <= 0) {
+                          return 'Enter a valid number > 0';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Requested New Limit: $newLimit employees',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState?.validate() ?? false) {
+                      final reqSeats = int.parse(controller.text.trim());
+                      
+                      await FirebaseFirestore.instance
+                          .collection('companies')
+                          .doc(company.companyId)
+                          .update({
+                        'requestedSeats': reqSeats,
+                        'requestCurrentLimit': currentLimit,
+                        'requestNewLimit': currentLimit + reqSeats,
+                        'requestStatus': 'pending',
+                        'requestedAt': FieldValue.serverTimestamp(),
+                      });
+                      
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Seat increase request submitted successfully.')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Submit Request'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -121,7 +512,6 @@ class EmployeeListScreen extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: AppSizes.maxContentWidth),
           child: Column(
             children: [
-              // Search Text Field
               TextField(
                 onChanged: (val) => ref.read(employeeSearchQueryProvider.notifier).state = val,
                 decoration: InputDecoration(
@@ -139,8 +529,6 @@ class EmployeeListScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSizes.p12),
-              
-              // Responsive Dropdowns
               if (isMobile)
                 ExpansionTile(
                   title: const Text('Filters', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -260,6 +648,7 @@ class EmployeeListScreen extends ConsumerWidget {
     String? dept,
     String? role,
     String? status,
+    bool isLimitReached,
   ) {
     final theme = Theme.of(context);
     final hasFilters = query.isNotEmpty || dept != null || role != null || status != null;
@@ -301,7 +690,7 @@ class EmployeeListScreen extends ConsumerWidget {
               )
             else
               ElevatedButton.icon(
-                onPressed: () => context.push('/employees/add'),
+                onPressed: isLimitReached ? null : () => context.push('/employees/add'),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add First Employee'),
               ),
@@ -441,11 +830,8 @@ class EmployeeListScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(AppSizes.p16),
           child: Row(
             children: [
-              // Photo / Avatar
               _buildAvatar(employee, 56),
               const SizedBox(width: AppSizes.p16),
-              
-              // Details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,7 +903,6 @@ class EmployeeListScreen extends ConsumerWidget {
       );
     }
 
-    // Default Initials-based Avatar
     final initials = employee.name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase();
     return Container(
       width: size,

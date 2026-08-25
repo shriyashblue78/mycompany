@@ -28,6 +28,10 @@ class NotificationService {
   /// Request notification permissions and register the FCM token
   Future<void> setupFCM(String companyId, String employeeId) async {
     if (_fcmSetupDone) return;
+    if (kIsWeb) {
+      debugPrint('FCM setup skipped on web environment');
+      return;
+    }
     try {
       final FirebaseMessaging messaging = FirebaseMessaging.instance;
 
@@ -676,6 +680,61 @@ class NotificationService {
       createdByName: userName,
       relatedDocumentId: toolId,
       actionOrStatus: isEdit ? 'updated' : 'created',
+    );
+  }
+
+  // --- Project Tracker Events ---
+  Future<void> notifyProjectStageTransition({
+    required String companyId,
+    required String projectId,
+    required String projectName,
+    required String stageName,
+    required String status,
+    required String userUid,
+    required String userName,
+  }) async {
+    final title = 'Project "$projectName" reaches $stageName';
+    final message = 'The project has progressed to the $stageName stage (Status: $status) by $userName.';
+    
+    String targetDept = stageName;
+    if (stageName == 'Accounts') {
+      targetDept = 'Accountant';
+    }
+
+    await sendNotification(
+      companyId: companyId,
+      title: title,
+      message: message,
+      type: 'Announcement',
+      priority: 'Medium',
+      targetType: 'Department',
+      targetDepartment: targetDept,
+      createdByUid: userUid,
+      createdByName: userName,
+      relatedDocumentId: projectId,
+      actionOrStatus: 'stage_$stageName',
+    );
+  }
+
+  Future<void> notifyProjectFullyCompleted({
+    required String companyId,
+    required String projectId,
+    required String projectName,
+    required String userUid,
+    required String userName,
+  }) async {
+    await sendNotification(
+      companyId: companyId,
+      title: 'Project "$projectName" is COMPLETED!',
+      message: 'Accounts has completed the final stage of project "$projectName". The entire project is marked Completed.',
+      type: 'Announcement',
+      priority: 'High',
+      targetType: 'Company',
+      targetRoles: ['Owner', 'HR', 'Supervisor'],
+      createdByUid: userUid,
+      createdByName: userName,
+      relatedDocumentId: projectId,
+      actionOrStatus: 'fully_completed',
     );
   }
 }

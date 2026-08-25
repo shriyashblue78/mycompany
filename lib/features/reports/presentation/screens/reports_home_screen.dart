@@ -80,6 +80,7 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
     // Auth context
     final authState = ref.watch(authProvider);
     final role = authState.selectedRole ?? 'Employee';
+    final isLowStockEnabled = authState.enabledModules.contains('low_stock');
     
     // Safety redirection if supervisor or employee enters somehow
     if (role != 'Owner' && role != 'HR') {
@@ -156,7 +157,7 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
 
     // Inventory
     int totalItems = inventory.length;
-    int lowStockItems = 0;
+    int lowStockItems = inventory.where((i) => i.currentStock <= 0).length;
     int outOfStockItems = inventory.where((i) => i.currentStock <= 0).length;
 
     // Production
@@ -218,7 +219,9 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
       csvBuffer.writeln('Present Today,$presentToday');
       csvBuffer.writeln('Absent Today,$absentToday');
       csvBuffer.writeln('Total Inventory Items,$totalItems');
-      csvBuffer.writeln('Low Stock Items,$lowStockItems');
+      if (isLowStockEnabled) {
+        csvBuffer.writeln('Low Stock Items,$lowStockItems');
+      }
       csvBuffer.writeln('Running Productions,$runningTotal');
       csvBuffer.writeln('Today\'s Purchases,${purchaseToday.length} ($purchaseAmountToday)');
       csvBuffer.writeln('Today\'s Sales,${salesToday.length} ($salesAmountToday)');
@@ -232,7 +235,9 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
       csvBuffer.writeln('Attendance,Absent,$absentToday,$absentMonth,$absentTotal');
       csvBuffer.writeln('Attendance,Late,$lateToday,$lateMonth,$lateTotal');
       csvBuffer.writeln('Inventory,Total Items,$totalItems,$totalItems,$totalItems');
-      csvBuffer.writeln('Inventory,Low Stock,$lowStockItems,$lowStockItems,$lowStockItems');
+      if (isLowStockEnabled) {
+        csvBuffer.writeln('Inventory,Low Stock,$lowStockItems,$lowStockItems,$lowStockItems');
+      }
       csvBuffer.writeln('Inventory,Out Of Stock,$outOfStockItems,$outOfStockItems,$outOfStockItems');
       csvBuffer.writeln('Production,Running,$runningToday,$runningMonth,$runningTotal');
       csvBuffer.writeln('Production,Completed,$completedToday,$completedMonth,$completedTotal');
@@ -271,7 +276,8 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
                     <String>['Present Today', '$presentToday'],
                     <String>['Absent Today', '$absentToday'],
                     <String>['Total Inventory Items', '$totalItems'],
-                    <String>['Low Stock Items', '$lowStockItems'],
+                    if (isLowStockEnabled)
+                      <String>['Low Stock Items', '$lowStockItems'],
                     <String>['Running Productions', '$runningTotal'],
                     <String>['Pending Tasks', '$pendingTasksCount'],
                     <String>['Pending Leaves', '$pendingLeavesCount'],
@@ -289,7 +295,8 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
                     <String>['Attendance', 'Absent', '$absentToday', '$absentMonth', '$absentTotal'],
                     <String>['Attendance', 'Late', '$lateToday', '$lateMonth', '$lateTotal'],
                     <String>['Inventory', 'Total Items', '$totalItems', '$totalItems', '$totalItems'],
-                    <String>['Inventory', 'Low Stock', '$lowStockItems', '$lowStockItems', '$lowStockItems'],
+                    if (isLowStockEnabled)
+                      <String>['Inventory', 'Low Stock', '$lowStockItems', '$lowStockItems', '$lowStockItems'],
                     <String>['Inventory', 'Out Of Stock', '$outOfStockItems', '$outOfStockItems', '$outOfStockItems'],
                     <String>['Production', 'Running', '$runningToday', '$runningMonth', '$runningTotal'],
                     <String>['Production', 'Completed', '$completedToday', '$completedMonth', '$completedTotal'],
@@ -368,11 +375,12 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
             ResponsiveGrid(
               mobileCrossAxisCount: 2,
               tabletCrossAxisCount: 2,
-              desktopCrossAxisCount: 4,
+              desktopCrossAxisCount: isLowStockEnabled ? 4 : 3,
               mainAxisExtent: 96,
               children: [
                 _buildSummaryCard('Total Employees', '${employees.length}', Icons.people, Colors.blue),
-                _buildSummaryCard('Low Stock', '$lowStockItems', Icons.inventory_2, Colors.amber),
+                if (isLowStockEnabled)
+                  _buildSummaryCard('Low Stock', '$lowStockItems', Icons.inventory_2, Colors.amber),
                 _buildSummaryCard('Running Productions', '$runningTotal', Icons.precision_manufacturing, Colors.green),
                 _buildSummaryCard('Today\'s Sales', '\$$salesAmountToday', Icons.sell, Colors.teal),
               ],
@@ -440,7 +448,8 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
                           _buildDataRow('Attendance', 'Absent', '$absentToday', '$absentMonth', '$absentTotal'),
                           _buildDataRow('Attendance', 'Late', '$lateToday', '$lateMonth', '$lateTotal'),
                           _buildDataRow('Inventory', 'Total Items', '$totalItems', '$totalItems', '$totalItems'),
-                          _buildDataRow('Inventory', 'Low Stock', '$lowStockItems', '$lowStockItems', '$lowStockItems'),
+                          if (isLowStockEnabled)
+                             _buildDataRow('Inventory', 'Low Stock', '$lowStockItems', '$lowStockItems', '$lowStockItems'),
                           _buildDataRow('Inventory', 'Out of Stock', '$outOfStockItems', '$outOfStockItems', '$outOfStockItems'),
                           _buildDataRow('Production', 'Running', '$runningToday', '$runningMonth', '$runningTotal'),
                           _buildDataRow('Production', 'Completed', '$completedToday', '$completedMonth', '$completedTotal'),

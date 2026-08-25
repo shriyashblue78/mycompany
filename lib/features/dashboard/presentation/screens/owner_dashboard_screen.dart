@@ -45,7 +45,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
         body: dashboardAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Center(child: Text('Error: $err')),
-          data: (stats) => _buildMobileBody(context, stats, userName, company, isDark, theme, authState.companyLogoUrl),
+          data: (stats) => _buildMobileBody(context, authState, stats, userName, company, isDark, theme, authState.companyLogoUrl),
         ),
       );
     }
@@ -89,7 +89,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
                         Text('Operations Analytics',
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: AppSizes.p12),
-                        _buildDesktopStatsGrid(context, stats),
+                        _buildDesktopStatsGrid(context, authState, stats),
                         const SizedBox(height: AppSizes.p32),
                         Text('Quick Actions',
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
@@ -180,8 +180,72 @@ class OwnerDashboardScreen extends ConsumerWidget {
   }
 
   // ─── Mobile body ─────────────────────────────────────────────────────────
-  Widget _buildMobileBody(BuildContext context, DashboardStatsData stats,
+  Widget _buildMobileBody(BuildContext context, AuthState authState, DashboardStatsData stats,
       String userName, String company, bool isDark, ThemeData theme, String? logoUrl) {
+    bool isEnabled(String mod) => authState.enabledModules.contains(mod);
+
+    final cards = <Widget>[];
+    if (isEnabled('employees')) {
+      cards.add(MobileStatCard(
+        label: 'Employees',
+        value: '${stats.totalEmployees}',
+        icon: Icons.people_rounded,
+        color: Colors.blue,
+        width: double.infinity,
+        onTap: () => context.push('/employees'),
+      ));
+    }
+    if (isEnabled('attendance')) {
+      cards.add(MobileStatCard(
+        label: 'Present Today',
+        value: '${stats.presentToday}',
+        icon: Icons.check_circle_rounded,
+        color: AppColors.success,
+        width: double.infinity,
+        onTap: () => context.push('/attendance'),
+      ));
+    }
+    if (isEnabled('low_stock')) {
+      cards.add(MobileStatCard(
+        label: 'Low Stock',
+        value: '${stats.lowStockItems}',
+        icon: Icons.warning_amber_rounded,
+        color: AppColors.error,
+        width: double.infinity,
+        onTap: () => context.push('/inventory'),
+      ));
+    }
+    if (isEnabled('production')) {
+      cards.add(MobileStatCard(
+        label: 'Production',
+        value: '${stats.runningProduction}',
+        icon: Icons.precision_manufacturing_rounded,
+        color: Colors.purple,
+        width: double.infinity,
+        onTap: () => context.push('/production'),
+      ));
+    }
+    if (isEnabled('sales')) {
+      cards.add(MobileStatCard(
+        label: "Today's Sales",
+        value: '₹${stats.todaySalesAmount.toStringAsFixed(0)}',
+        icon: Icons.monetization_on_rounded,
+        color: Colors.amber,
+        width: double.infinity,
+        onTap: () => context.push('/sales/analytics'),
+      ));
+    }
+    if (isEnabled('tasks')) {
+      cards.add(MobileStatCard(
+        label: 'Pending Tasks',
+        value: '${stats.pendingTasks}',
+        icon: Icons.task_rounded,
+        color: Colors.indigo,
+        width: double.infinity,
+        onTap: () => context.push('/tasks'),
+      ));
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
@@ -198,67 +262,20 @@ class OwnerDashboardScreen extends ConsumerWidget {
         const SizedBox(height: 20),
 
         // KPI Stats grid
-        Text('Operations Overview', style: MobileText.sectionStyle(context)),
-        const SizedBox(height: 10),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          mainAxisExtent: 110,
-          children: [
-            MobileStatCard(
-              label: 'Employees',
-              value: '${stats.totalEmployees}',
-              icon: Icons.people_rounded,
-              color: Colors.blue,
-              width: double.infinity,
-              onTap: () => context.push('/employees'),
-            ),
-            MobileStatCard(
-              label: 'Present Today',
-              value: '${stats.presentToday}',
-              icon: Icons.check_circle_rounded,
-              color: AppColors.success,
-              width: double.infinity,
-              onTap: () => context.push('/attendance'),
-            ),
-            MobileStatCard(
-              label: 'Low Stock',
-              value: '${stats.lowStockItems}',
-              icon: Icons.warning_amber_rounded,
-              color: AppColors.error,
-              width: double.infinity,
-              onTap: () => context.push('/inventory'),
-            ),
-            MobileStatCard(
-              label: 'Production',
-              value: '${stats.runningProduction}',
-              icon: Icons.precision_manufacturing_rounded,
-              color: Colors.purple,
-              width: double.infinity,
-              onTap: () => context.push('/production'),
-            ),
-            MobileStatCard(
-              label: "Today's Sales",
-              value: '₹${stats.todaySalesAmount.toStringAsFixed(0)}',
-              icon: Icons.monetization_on_rounded,
-              color: Colors.amber,
-              width: double.infinity,
-              onTap: () => context.push('/sales/analytics'),
-            ),
-            MobileStatCard(
-              label: 'Pending Tasks',
-              value: '${stats.pendingTasks}',
-              icon: Icons.task_rounded,
-              color: Colors.indigo,
-              width: double.infinity,
-              onTap: () => context.push('/tasks'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
+        if (cards.isNotEmpty) ...[
+          Text('Operations Overview', style: MobileText.sectionStyle(context)),
+          const SizedBox(height: 10),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 110,
+            children: cards,
+          ),
+          const SizedBox(height: 24),
+        ],
 
         // Quick Actions
         Text('Quick Actions', style: MobileText.sectionStyle(context)),
@@ -446,18 +463,38 @@ class OwnerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDesktopStatsGrid(BuildContext context, DashboardStatsData stats) {
+  Widget _buildDesktopStatsGrid(BuildContext context, AuthState authState, DashboardStatsData stats) {
+    bool isEnabled(String mod) => authState.enabledModules.contains(mod);
+
+    final cards = <_StatCardData>[];
+    if (isEnabled('employees')) {
+      cards.add(_StatCardData('Total Employees', '${stats.totalEmployees}', Icons.people_rounded, Colors.blue));
+    }
+    if (isEnabled('attendance')) {
+      cards.add(_StatCardData('Present Today', '${stats.presentToday}', Icons.check_circle_rounded, Colors.green));
+    }
+    if (isEnabled('low_stock')) {
+      cards.add(_StatCardData('Low Stock Items', '${stats.lowStockItems}', Icons.warning_amber_rounded, Colors.red));
+    }
+    if (isEnabled('production')) {
+      cards.add(_StatCardData('Running Production', '${stats.runningProduction}', Icons.precision_manufacturing_rounded, Colors.purple));
+    }
+    if (isEnabled('purchase')) {
+      cards.add(_StatCardData("Today's Purchases", '\$${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal));
+    }
+    if (isEnabled('sales')) {
+      cards.add(_StatCardData("Today's Sales", '₹${stats.todaySalesAmount.toStringAsFixed(0)}', Icons.monetization_on_rounded, Colors.amber));
+    }
+    if (isEnabled('leaves')) {
+      cards.add(_StatCardData('Pending Leaves', '${stats.pendingLeaveRequests}', Icons.time_to_leave_rounded, Colors.orange));
+    }
+    if (isEnabled('tasks')) {
+      cards.add(_StatCardData('Pending Tasks', '${stats.pendingTasks}', Icons.task_rounded, Colors.indigo));
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+
     final columns = ResponsiveLayout.isTablet(context) ? 3 : 4;
-    final cards = [
-      _StatCardData('Total Employees', '${stats.totalEmployees}', Icons.people_rounded, Colors.blue),
-      _StatCardData('Present Today', '${stats.presentToday}', Icons.check_circle_rounded, Colors.green),
-      _StatCardData('Low Stock Items', '${stats.lowStockItems}', Icons.warning_amber_rounded, Colors.red),
-      _StatCardData('Running Production', '${stats.runningProduction}', Icons.precision_manufacturing_rounded, Colors.purple),
-      _StatCardData("Today's Purchases", '\$${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal),
-      _StatCardData("Today's Sales", '₹${stats.todaySalesAmount.toStringAsFixed(0)}', Icons.monetization_on_rounded, Colors.amber),
-      _StatCardData('Pending Leaves', '${stats.pendingLeaveRequests}', Icons.time_to_leave_rounded, Colors.orange),
-      _StatCardData('Pending Tasks', '${stats.pendingTasks}', Icons.task_rounded, Colors.indigo),
-    ];
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

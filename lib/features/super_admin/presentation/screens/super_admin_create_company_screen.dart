@@ -11,6 +11,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/domain/models/company_model.dart';
 import '../providers/super_admin_provider.dart';
 import '../providers/provisioning_provider.dart';
+import '../../../auth/domain/models/company_modules.dart';
 
 class SuperAdminCreateCompanyScreen extends ConsumerStatefulWidget {
   const SuperAdminCreateCompanyScreen({super.key});
@@ -34,6 +35,8 @@ class _SuperAdminCreateCompanyScreenState extends ConsumerState<SuperAdminCreate
   final _countryController = TextEditingController(text: 'India');
   final _timezoneController = TextEditingController(text: 'Asia/Kolkata');
   final _workingHoursController = TextEditingController(text: '09:00 AM - 06:00 PM');
+  final _maxEmployeesController = TextEditingController(text: '50');
+  final List<String> _tempEnabledModules = List<String>.from(CompanyModules.all);
 
   // Logo upload state
   Uint8List? _logoBytes;
@@ -68,6 +71,7 @@ class _SuperAdminCreateCompanyScreenState extends ConsumerState<SuperAdminCreate
     _countryController.dispose();
     _timezoneController.dispose();
     _workingHoursController.dispose();
+    _maxEmployeesController.dispose();
 
     _ownerNameController.dispose();
     _ownerEmailController.dispose();
@@ -404,6 +408,63 @@ class _SuperAdminCreateCompanyScreenState extends ConsumerState<SuperAdminCreate
                         ),
                         const SizedBox(height: AppSizes.p24),
 
+                        // Section 1.5: Operational License & Modules Configuration
+                        const Divider(),
+                        const SizedBox(height: AppSizes.p8),
+                        Text(
+                          '1.5 License & Enabled Modules',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                        ),
+                        const SizedBox(height: AppSizes.p16),
+                        
+                        // Seat Limit
+                        TextFormField(
+                          controller: _maxEmployeesController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Maximum Seat / Employee Limit *',
+                            prefixIcon: const Icon(Icons.people_alt_rounded),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                            ),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Maximum seat limit is required';
+                            final limit = int.tryParse(val.trim());
+                            if (limit == null || limit <= 0) return 'Enter a valid positive number';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSizes.p16),
+
+                        // Checkboxes for modules
+                        Text(
+                          'Configure Enabled Modules:',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppSizes.p8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 4.0,
+                          children: CompanyModules.all.map((mod) {
+                            final isSelected = _tempEnabledModules.contains(mod);
+                            return FilterChip(
+                              label: Text(mod.replaceAll('_', ' ').toUpperCase()),
+                              selected: isSelected,
+                              onSelected: (checked) {
+                                setState(() {
+                                  if (checked) {
+                                    _tempEnabledModules.add(mod);
+                                  } else {
+                                    _tempEnabledModules.remove(mod);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSizes.p24),
+
                         // Section 2: Owner Information
                         const Divider(),
                         const SizedBox(height: AppSizes.p8),
@@ -596,6 +657,8 @@ class _SuperAdminCreateCompanyScreenState extends ConsumerState<SuperAdminCreate
         ownerStatus: 'Active',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        maxEmployees: int.parse(_maxEmployeesController.text.trim()),
+        enabledModules: _tempEnabledModules,
       );
 
       // 4. Create Company record in Firestore

@@ -16,6 +16,7 @@ class SuperAdminCompanyListScreen extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final companiesAsync = ref.watch(filteredCompaniesProvider);
+    final allCompaniesAsync = ref.watch(companiesStreamProvider);
     final searchQuery = ref.watch(companySearchQueryProvider);
     final statusFilter = ref.watch(companyStatusFilterProvider);
     final industryFilter = ref.watch(companyIndustryFilterProvider);
@@ -33,6 +34,17 @@ class SuperAdminCompanyListScreen extends ConsumerWidget {
           // Filter section
           _buildFilterHeader(context, ref, searchQuery, statusFilter, industryFilter, selectedSort, theme),
 
+          // Pending Requests banner
+          allCompaniesAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (allList) {
+              final pending = allList.where((c) => c.requestStatus == 'pending').toList();
+              if (pending.isEmpty) return const SizedBox.shrink();
+              return _buildPendingRequestsSection(context, ref, pending, theme, isDark);
+            },
+          ),
+
           // Stream list
           Expanded(
             child: companiesAsync.when(
@@ -48,6 +60,206 @@ class SuperAdminCompanyListScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPendingRequestsSection(
+    BuildContext context,
+    WidgetRef ref,
+    List<CompanyModel> pending,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.05),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.amber.withOpacity(0.2),
+            width: 1.0,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.all(AppSizes.p16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hourglass_empty_rounded, color: Colors.amber, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Pending Seat Increase Requests (${pending.length})',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.p12),
+          SizedBox(
+            height: 110,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: pending.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (ctx, idx) {
+                final company = pending[idx];
+                return _buildPendingRequestCard(context, ref, company, theme, isDark);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingRequestCard(
+    BuildContext context,
+    WidgetRef ref,
+    CompanyModel company,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    final requested = company.requestedSeats ?? 0;
+    final current = company.maxEmployees;
+    final target = company.requestNewLimit ?? (current + requested);
+
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(AppSizes.p12),
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+        border: Border.all(
+          color: Colors.amber.withOpacity(0.3),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            company.companyName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Current limit: $current → Requested limit: $target (+$requested)',
+            style: TextStyle(color: theme.textTheme.bodySmall?.color?.withOpacity(0.8), fontSize: 11),
+          ),
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => _handleRequestAction(context, ref, company, approve: false),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => _handleRequestAction(context, ref, company, approve: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  elevation: 0,
+                ),
+                child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleRequestAction(
+    BuildContext context,
+    WidgetRef ref,
+    CompanyModel company, {
+    required bool approve,
+  }) {
+    final actionText = approve ? 'Approve' : 'Reject';
+    final targetLimit = company.requestNewLimit ?? company.maxEmployees;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('$actionText Seat Request?'),
+          content: Text(approve
+              ? 'Are you sure you want to approve the request for +${company.requestedSeats} seats? This will increase the company seat limit from ${company.maxEmployees} to $targetLimit immediately.'
+              : 'Are you sure you want to reject the request for +${company.requestedSeats} seats? The owner will be notified of the rejection.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final repo = ref.read(superAdminRepositoryProvider);
+
+                try {
+                  CompanyModel updated;
+                  if (approve) {
+                    updated = company.copyWith(
+                      maxEmployees: targetLimit,
+                      requestStatus: 'approved',
+                      updatedAt: DateTime.now(),
+                    );
+                  } else {
+                    updated = company.copyWith(
+                      requestStatus: 'rejected',
+                      updatedAt: DateTime.now(),
+                    );
+                  }
+
+                  await repo.updateCompany(updated);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Seat increase request ${approve ? "approved" : "rejected"} successfully.'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating request: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: approve ? AppColors.success : AppColors.error,
+              ),
+              child: Text(actionText, style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -230,63 +442,85 @@ class SuperAdminCompanyListScreen extends ConsumerWidget {
               color: isDark ? Colors.white12 : Colors.grey.shade200,
             ),
           ),
-          child: ListTile(
+          child: InkWell(
             onTap: () {
               context.push('/super-admin/company/${company.companyId}');
             },
-            leading: CircleAvatar(
-              backgroundColor: theme.colorScheme.primary.withAlpha(26),
-              radius: 24,
-              child: Text(
-                company.companyName.isNotEmpty ? company.companyName[0].toUpperCase() : 'C',
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    company.companyName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _buildBadge(company.status, _getStatusColor(company.status)),
-              ],
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6.0),
+            borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSizes.p16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header Row: Logo, Name, App Access Status, Chevron
                   Row(
                     children: [
-                      Text(
-                        'Code: ${company.companyCode}',
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      CircleAvatar(
+                        backgroundColor: theme.colorScheme.primary.withAlpha(26),
+                        radius: 22,
+                        child: Text(
+                          company.companyName.isNotEmpty ? company.companyName[0].toUpperCase() : 'C',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSizes.p12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              company.companyName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Code: ${company.companyCode}  •  ${company.industry}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '•',
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      // App Access Badge
+                      _buildAppAccessBadge(company.status),
                       const SizedBox(width: 8),
-                      Text(
-                        company.industry,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.colorScheme.onSurface.withAlpha(77)),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSizes.p12),
+                  const Divider(height: 1),
+                  const SizedBox(height: AppSizes.p12),
+                  // Details Row: Seats, Subscription Plan, Joined
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Seats Usage
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final countAsync = ref.watch(companyEmployeeCountProvider(company.companyId));
+                          return countAsync.when(
+                            loading: () => Text('Seats: -- / ${company.maxEmployees}', style: theme.textTheme.bodySmall),
+                            error: (_, __) => Text('Seats: Error / ${company.maxEmployees}', style: theme.textTheme.bodySmall),
+                            data: (count) => Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.people_alt_rounded, size: 14, color: theme.colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Seats: $count / ${company.maxEmployees}',
+                                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                       Text(
                         'Plan: ${company.subscriptionPlan}',
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -300,13 +534,66 @@ class SuperAdminCompanyListScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: AppSizes.p12),
+                  // Enabled Modules Row
+                  if (company.enabledModules.isNotEmpty) ...[
+                    Text(
+                      'Enabled Modules:',
+                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: company.enabledModules.map((mod) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withAlpha(15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: theme.colorScheme.primary.withAlpha(40)),
+                          ),
+                          child: Text(
+                            mod.replaceAll('_', ' ').toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ],
               ),
             ),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAppAccessBadge(String status) {
+    final isON = status == 'Active' || status == 'Trial';
+    final label = isON ? 'APP ACCESS: ON' : 'APP ACCESS: OFF';
+    final color = isON ? AppColors.success : AppColors.error;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withAlpha(80), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 

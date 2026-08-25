@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../auth/domain/models/company_model.dart';
 import '../../domain/repositories/super_admin_repository.dart';
 import '../../data/repositories/super_admin_repository_impl.dart';
@@ -22,6 +23,16 @@ final companiesStreamProvider = StreamProvider<List<CompanyModel>>((ref) {
 // Stream Provider for a single company's details
 final companyDetailsStreamProvider = StreamProvider.family<CompanyModel?, String>((ref, companyId) {
   return ref.watch(superAdminRepositoryProvider).streamCompanyById(companyId);
+});
+
+// Stream Provider for a company's employee count (seats usage)
+final companyEmployeeCountProvider = StreamProvider.family<int, String>((ref, companyId) {
+  return FirebaseFirestore.instance
+      .collection('companies')
+      .doc(companyId)
+      .collection('employees')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.length);
 });
 
 // Filtered and sorted companies stream

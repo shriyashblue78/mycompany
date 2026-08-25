@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'company_modules.dart';
 
 class CompanyModel {
   final String companyId;
@@ -26,6 +27,15 @@ class CompanyModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final int performanceDeductionPerMinute;
+  final int maxEmployees;
+  final List<String> enabledModules;
+
+  // Seat request fields
+  final int? requestedSeats;
+  final int? requestCurrentLimit;
+  final int? requestNewLimit;
+  final String? requestStatus; // pending, approved, rejected, or null
+  final DateTime? requestedAt;
 
   const CompanyModel({
     required this.companyId,
@@ -53,6 +63,13 @@ class CompanyModel {
     required this.createdAt,
     required this.updatedAt,
     this.performanceDeductionPerMinute = 1,
+    this.maxEmployees = 50,
+    this.enabledModules = CompanyModules.all,
+    this.requestedSeats,
+    this.requestCurrentLimit,
+    this.requestNewLimit,
+    this.requestStatus,
+    this.requestedAt,
   });
 
   // Backward compatibility getters
@@ -93,6 +110,15 @@ class CompanyModel {
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
       performanceDeductionPerMinute: (map['performanceDeductionPerMinute'] ?? 1) as int,
+      maxEmployees: (map['maxEmployees'] ?? 50) as int,
+      enabledModules: map['enabledModules'] != null
+          ? List<String>.from(map['enabledModules'] as List)
+          : CompanyModules.all,
+      requestedSeats: map['requestedSeats'] as int?,
+      requestCurrentLimit: map['requestCurrentLimit'] as int?,
+      requestNewLimit: map['requestNewLimit'] as int?,
+      requestStatus: map['requestStatus'] as String?,
+      requestedAt: map['requestedAt'] != null ? parseDate(map['requestedAt']) : null,
     );
   }
 
@@ -123,6 +149,13 @@ class CompanyModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'performanceDeductionPerMinute': performanceDeductionPerMinute,
+      'maxEmployees': maxEmployees,
+      'enabledModules': enabledModules,
+      'requestedSeats': requestedSeats,
+      'requestCurrentLimit': requestCurrentLimit,
+      'requestNewLimit': requestNewLimit,
+      'requestStatus': requestStatus,
+      'requestedAt': requestedAt != null ? Timestamp.fromDate(requestedAt!) : null,
     };
   }
 
@@ -152,6 +185,13 @@ class CompanyModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? performanceDeductionPerMinute,
+    int? maxEmployees,
+    List<String>? enabledModules,
+    int? requestedSeats,
+    int? requestCurrentLimit,
+    int? requestNewLimit,
+    String? requestStatus,
+    DateTime? requestedAt,
   }) {
     return CompanyModel(
       companyId: companyId ?? this.companyId,
@@ -179,6 +219,13 @@ class CompanyModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       performanceDeductionPerMinute: performanceDeductionPerMinute ?? this.performanceDeductionPerMinute,
+      maxEmployees: maxEmployees ?? this.maxEmployees,
+      enabledModules: enabledModules ?? this.enabledModules,
+      requestedSeats: requestedSeats ?? this.requestedSeats,
+      requestCurrentLimit: requestCurrentLimit ?? this.requestCurrentLimit,
+      requestNewLimit: requestNewLimit ?? this.requestNewLimit,
+      requestStatus: requestStatus ?? this.requestStatus,
+      requestedAt: requestedAt ?? this.requestedAt,
     );
   }
 }

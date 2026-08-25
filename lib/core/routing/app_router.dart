@@ -4,9 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/company_blocked_screen.dart';
+import '../../features/auth/presentation/screens/feature_locked_screen.dart';
+import '../../features/project_tracker/domain/models/project_tracker_config.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/hr_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/employee_dashboard_screen.dart';
+import '../../features/auth/domain/models/user_model.dart';
 import '../../features/employee/domain/models/employee_model.dart';
 import '../../features/employee/presentation/screens/employee_list_screen.dart';
 import '../../features/employee/presentation/screens/employee_detail_screen.dart';
@@ -76,6 +80,10 @@ import '../../features/drawings/presentation/screens/drawing_form_screen.dart';
 import '../../features/programs/domain/models/program_model.dart';
 import '../../features/programs/presentation/screens/program_list_screen.dart';
 import '../../features/programs/presentation/screens/program_form_screen.dart';
+import '../../features/project_tracker/domain/models/project_model.dart';
+import '../../features/project_tracker/presentation/screens/project_dashboard_screen.dart';
+import '../../features/project_tracker/presentation/screens/project_form_screen.dart';
+import '../../features/project_tracker/presentation/screens/project_detail_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -114,9 +122,240 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
+      // Check if company access is deactivated/OFF (for non-super-admins)
+      if (currentAuthState.selectedRole != 'super_admin' && !currentAuthState.isCompanyActive) {
+        if (currentRoute != '/company-blocked') {
+          return '/company-blocked';
+        }
+        return null;
+      }
+
+      // Do not allow staying on /company-blocked if company is active
+      if (currentRoute == '/company-blocked') {
+        return _getDashboardRoute(currentAuthState.selectedRole);
+      }
+
       // User is logged in. Redirect away from splash/login to correct dashboard
       if (currentRoute == '/login' || currentRoute == '/splash') {
         return _getDashboardRoute(currentAuthState.selectedRole);
+      }
+
+      // Helper to check module enablement
+      bool isModuleEnabled(String module) {
+        if (currentAuthState.selectedRole == 'super_admin') return true;
+        return currentAuthState.enabledModules.contains(module);
+      }
+
+      // Check role permissions & module gating for each route prefix
+
+      // 1. Employees
+      final hasEmployeesRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/employees')) {
+        if (!hasEmployeesRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('employees')) {
+          return '/feature-locked?module=Employee Management';
+        }
+      }
+
+      // 2. Attendance
+      if (currentRoute.startsWith('/attendance')) {
+        if (!isModuleEnabled('attendance')) {
+          return '/feature-locked?module=Attendance Tracking';
+        }
+      }
+
+      // 3. Tasks
+      if (currentRoute.startsWith('/tasks')) {
+        if (!isModuleEnabled('tasks')) {
+          return '/feature-locked?module=Task Management';
+        }
+      }
+
+      // 4. Leaves
+      if (currentRoute.startsWith('/leaves')) {
+        if (!isModuleEnabled('leaves')) {
+          return '/feature-locked?module=Leaves Portal';
+        }
+      }
+
+      // 5. Production
+      if (currentRoute.startsWith('/production')) {
+        if (!isModuleEnabled('production')) {
+          return '/feature-locked?module=Production Control';
+        }
+      }
+
+      // 6. Machines
+      final hasMachinesRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/machines')) {
+        if (!hasMachinesRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('machines')) {
+          return '/feature-locked?module=Machines';
+        }
+      }
+
+      // 7. Tooling
+      final hasToolingRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/tooling')) {
+        if (!hasToolingRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('tooling')) {
+          return '/feature-locked?module=Tooling';
+        }
+      }
+
+      // 8. Drawings
+      final hasDrawingsRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/drawings')) {
+        if (!hasDrawingsRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('drawings')) {
+          return '/feature-locked?module=Drawings';
+        }
+      }
+
+      // 9. Programs
+      final hasProgramsRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/programs')) {
+        if (!hasProgramsRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('programs')) {
+          return '/feature-locked?module=Programs';
+        }
+      }
+
+      // 10. Inventory
+      final hasInventoryRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/inventory')) {
+        if (!hasInventoryRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('inventory')) {
+          return '/feature-locked?module=Inventory Management';
+        }
+      }
+
+      // 11. Purchase
+      final hasPurchaseRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/purchase')) {
+        if (!hasPurchaseRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('purchase')) {
+          return '/feature-locked?module=Purchase Management';
+        }
+      }
+
+      // 12. Sales
+      final hasSalesRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/sales')) {
+        if (!hasSalesRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('sales')) {
+          return '/feature-locked?module=Sales Management';
+        }
+      }
+
+      // 13. Billing
+      final hasBillingRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/billing')) {
+        if (!hasBillingRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('billing')) {
+          return '/feature-locked?module=Billing & Invoicing';
+        }
+      }
+
+      // 14. Reports
+      final hasReportsRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor';
+      if (currentRoute.startsWith('/reports')) {
+        if (!hasReportsRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('reports')) {
+          return '/feature-locked?module=Analytics & Reports';
+        }
+      }
+
+      // 15. Notifications
+      if (currentRoute.startsWith('/notifications')) {
+        if (!isModuleEnabled('notifications')) {
+          return '/feature-locked?module=Broadcast & Notifications';
+        }
+      }
+
+      // 16. Documents
+      final hasDocumentsRolePermission = currentAuthState.selectedRole == 'Owner';
+      if (currentRoute.startsWith('/documents')) {
+        if (!hasDocumentsRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('documents')) {
+          return '/feature-locked?module=Document Storage';
+        }
+      }
+
+      // 17. Comparison
+      final hasComparisonRolePermission = currentAuthState.selectedRole == 'Owner';
+      if (currentRoute.startsWith('/comparison')) {
+        if (!hasComparisonRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('comparison')) {
+          return '/feature-locked?module=Comparison';
+        }
+      }
+
+      // Helper to check if user has access to Project Tracker module
+      bool hasProjectTrackerAccess(UserModel? user) {
+        return ProjectTrackerConfig.hasAccess(user?.role, user?.department);
+      }
+
+      // 18. Project Tracker
+      if (currentRoute.startsWith('/project-tracker')) {
+        if (!hasProjectTrackerAccess(currentAuthState.user)) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+        if (!isModuleEnabled('project_tracker')) {
+          return '/feature-locked?module=Project Tracker';
+        }
+      }
+
+      // Enforce role-based access for Project Tracker creation and editing (Owner/Managers Only)
+      if (currentRoute == '/project-tracker/create' || (currentRoute.startsWith('/project-tracker/') && currentRoute.endsWith('/edit'))) {
+        final role = currentAuthState.selectedRole;
+        if (role == null || !ProjectTrackerConfig.managerRoles.contains(role)) {
+          return '/project-tracker';
+        }
       }
 
       // Enforce role-based access for employee management module
@@ -337,6 +576,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/company-blocked',
+        name: 'company_blocked',
+        builder: (context, state) => const CompanyBlockedScreen(),
+      ),
+      GoRoute(
+        path: '/feature-locked',
+        name: 'feature_locked',
+        builder: (context, state) => const FeatureLockedScreen(),
       ),
       GoRoute(
         path: '/owner-dashboard',
@@ -768,6 +1017,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/reports',
         name: 'reports',
         builder: (context, state) => const ReportsHomeScreen(),
+      ),
+      GoRoute(
+        path: '/project-tracker',
+        name: 'project_tracker_dashboard',
+        builder: (context, state) => const ProjectDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/project-tracker/create',
+        name: 'project_tracker_create',
+        builder: (context, state) => const ProjectFormScreen(),
+      ),
+      GoRoute(
+        path: '/project-tracker/:id',
+        name: 'project_tracker_detail',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ProjectDetailScreen(projectId: id);
+        },
+      ),
+      GoRoute(
+        path: '/project-tracker/:id/edit',
+        name: 'project_tracker_edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final project = state.extra as ProjectModel?;
+          return ProjectFormScreen(projectId: id, project: project);
+        },
       ),
       GoRoute(
         path: '/super-admin',

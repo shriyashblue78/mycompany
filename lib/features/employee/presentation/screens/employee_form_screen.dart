@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/custom_button.dart';
@@ -192,6 +193,20 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         }
       } else {
         // Add flow
+        // Check maximum employee seat limit
+        final companyDoc = await FirebaseFirestore.instance.collection('companies').doc(companyId).get();
+        if (companyDoc.exists) {
+          final maxEmployees = companyDoc.data()?['maxEmployees'] as int? ?? 50;
+          final employeesSnap = await FirebaseFirestore.instance.collection('companies').doc(companyId).collection('employees').get();
+          if (employeesSnap.docs.length >= maxEmployees) {
+            setState(() {
+              _isLoading = false;
+              _formErrorMessage = 'Employee limit reached. Please contact the Main Admin to increase your seat limit.';
+            });
+            return;
+          }
+        }
+
         // 1. Check duplicate ID
         final isIdDuplicate = await repository.isEmployeeIdExists(companyId, empId);
         if (isIdDuplicate) {

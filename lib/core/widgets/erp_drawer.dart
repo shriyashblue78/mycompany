@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/auth/domain/models/company_modules.dart';
+import '../../features/project_tracker/domain/models/project_tracker_config.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
 import '../constants/app_strings.dart';
+import '../../features/auth/domain/models/user_model.dart';
 
 class ERPDrawer extends ConsumerWidget {
   const ERPDrawer({super.key});
@@ -19,7 +22,6 @@ class ERPDrawer extends ConsumerWidget {
     final userName = authState.userName ?? 'User';
     final company = authState.selectedCompany ?? 'Apex Industries';
 
-    // Get current path to highlight active state
     final currentRoute = GoRouterState.of(context).uri.path;
 
     return Drawer(
@@ -27,7 +29,6 @@ class ERPDrawer extends ConsumerWidget {
         top: false,
         child: Column(
           children: [
-            // Custom Drawer Header with User details
             Container(
               padding: const EdgeInsets.only(top: 48, left: AppSizes.p24, right: AppSizes.p24, bottom: AppSizes.p20),
               color: isDark ? theme.colorScheme.surface : AppColors.primaryLight,
@@ -93,8 +94,6 @@ class ERPDrawer extends ConsumerWidget {
                 ],
               ),
             ),
-  
-            // Drawer Navigation Items List
             Expanded(
               child: SingleChildScrollView(
                 child: Padding(
@@ -121,28 +120,55 @@ class ERPDrawer extends ConsumerWidget {
     WidgetRef ref,
   ) {
     final List<Widget> children = [];
+    final authState = ref.watch(authProvider);
+
+    bool isModuleEnabled(String module) {
+      if (role == 'super_admin') return true;
+      return authState.enabledModules.contains(module);
+    }
+
+    bool hasProjectTrackerAccess(UserModel? user) {
+      return ProjectTrackerConfig.hasAccess(user?.role, user?.department);
+    }
 
     // MAIN Section
     final mainItems = <_NavItem>[];
-    mainItems.add(const _NavItem(AppStrings.navDashboard, Icons.home_rounded, '/-dashboard')); // matches dashboard paths like /owner-dashboard
-    
+    mainItems.add(const _NavItem(AppStrings.navDashboard, Icons.home_rounded, '/-dashboard'));
+
     if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
-      mainItems.add(const _NavItem(AppStrings.navEmployees, Icons.people_rounded, '/employees'));
+      mainItems.add(_NavItem(
+        AppStrings.navEmployees,
+        Icons.people_rounded,
+        '/employees',
+        isLocked: !isModuleEnabled(CompanyModules.employees),
+      ));
     }
 
+    final attendanceLocked = !isModuleEnabled(CompanyModules.attendance);
     if (role == 'Owner') {
-      mainItems.add(const _NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance'));
-      mainItems.add(const _NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks'));
-      mainItems.add(const _NavItem('Leaves Portal', Icons.time_to_leave_rounded, '/leaves'));
+      mainItems.add(_NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance', isLocked: attendanceLocked));
     } else if (role == 'HR' || role == 'Supervisor') {
-      mainItems.add(const _NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance'));
-      mainItems.add(const _NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks'));
-      mainItems.add(const _NavItem(AppStrings.navLeaveApproval, Icons.approval_rounded, '/leaves'));
+      mainItems.add(_NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance', isLocked: attendanceLocked));
     } else {
-      // Employee
-      mainItems.add(const _NavItem('My Attendance', Icons.fingerprint_rounded, '/attendance'));
-      mainItems.add(const _NavItem('My Tasks', Icons.checklist_rounded, '/tasks'));
-      mainItems.add(const _NavItem('Apply Leave', Icons.time_to_leave_rounded, '/leaves'));
+      mainItems.add(_NavItem('My Attendance', Icons.fingerprint_rounded, '/attendance', isLocked: attendanceLocked));
+    }
+
+    final tasksLocked = !isModuleEnabled(CompanyModules.tasks);
+    if (role == 'Owner') {
+      mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
+    } else if (role == 'HR' || role == 'Supervisor') {
+      mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
+    } else {
+      mainItems.add(_NavItem('My Tasks', Icons.checklist_rounded, '/tasks', isLocked: tasksLocked));
+    }
+
+    final leavesLocked = !isModuleEnabled(CompanyModules.leaves);
+    if (role == 'Owner') {
+      mainItems.add(_NavItem('Leaves Portal', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
+    } else if (role == 'HR' || role == 'Supervisor') {
+      mainItems.add(_NavItem(AppStrings.navLeaveApproval, Icons.approval_rounded, '/leaves', isLocked: leavesLocked));
+    } else {
+      mainItems.add(_NavItem('Apply Leave', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
     }
 
     if (mainItems.isNotEmpty) {
@@ -153,17 +179,32 @@ class ERPDrawer extends ConsumerWidget {
 
     // OPERATIONS Section
     final operationsItems = <_NavItem>[];
-    operationsItems.add(const _NavItem(AppStrings.navProduction, Icons.precision_manufacturing_rounded, '/production'));
+
+    operationsItems.add(_NavItem(
+      AppStrings.navProduction,
+      Icons.precision_manufacturing_rounded,
+      '/production',
+      isLocked: !isModuleEnabled(CompanyModules.production),
+    ));
 
     if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
-      operationsItems.add(const _NavItem('Machines', Icons.settings_rounded, '/machines'));
-      operationsItems.add(const _NavItem('Tooling', Icons.build_rounded, '/tooling'));
-      operationsItems.add(const _NavItem('Drawings', Icons.architecture_rounded, '/drawings'));
-      operationsItems.add(const _NavItem('Programs', Icons.code_rounded, '/programs'));
-      operationsItems.add(const _NavItem(AppStrings.navInventory, Icons.inventory_2_rounded, '/inventory'));
-      operationsItems.add(const _NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase'));
-      operationsItems.add(const _NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales'));
-      operationsItems.add(const _NavItem('Billing', Icons.receipt_long_rounded, '/billing'));
+      operationsItems.add(_NavItem('Machines', Icons.settings_rounded, '/machines', isLocked: !isModuleEnabled(CompanyModules.machines)));
+      operationsItems.add(_NavItem('Tooling', Icons.build_rounded, '/tooling', isLocked: !isModuleEnabled(CompanyModules.tooling)));
+      operationsItems.add(_NavItem('Drawings', Icons.architecture_rounded, '/drawings', isLocked: !isModuleEnabled(CompanyModules.drawings)));
+      operationsItems.add(_NavItem('Programs', Icons.code_rounded, '/programs', isLocked: !isModuleEnabled(CompanyModules.programs)));
+      operationsItems.add(_NavItem(AppStrings.navInventory, Icons.inventory_2_rounded, '/inventory', isLocked: !isModuleEnabled(CompanyModules.inventory)));
+      operationsItems.add(_NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase', isLocked: !isModuleEnabled(CompanyModules.purchase)));
+      operationsItems.add(_NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales', isLocked: !isModuleEnabled(CompanyModules.sales)));
+      operationsItems.add(_NavItem('Billing', Icons.receipt_long_rounded, '/billing', isLocked: !isModuleEnabled(CompanyModules.billing)));
+    }
+
+    if (hasProjectTrackerAccess(authState.user)) {
+      operationsItems.add(_NavItem(
+        'Project Tracker',
+        Icons.assignment_turned_in_rounded,
+        '/project-tracker',
+        isLocked: !isModuleEnabled(CompanyModules.projectTracker),
+      ));
     }
 
     if (operationsItems.isNotEmpty) {
@@ -174,17 +215,40 @@ class ERPDrawer extends ConsumerWidget {
 
     // MANAGEMENT Section
     final managementItems = <_NavItem>[];
+
+    if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
+      final reportsLocked = !isModuleEnabled(CompanyModules.reports);
+      managementItems.add(_NavItem(
+        AppStrings.navReports,
+        role == 'Owner' ? Icons.analytics_rounded : Icons.assignment_rounded,
+        '/reports',
+        isLocked: reportsLocked,
+      ));
+    }
+
     if (role == 'Owner') {
-      managementItems.add(const _NavItem(AppStrings.navReports, Icons.analytics_rounded, '/reports'));
-      managementItems.add(const _NavItem(AppStrings.navDocuments, Icons.folder_shared_rounded, '/documents'));
-      managementItems.add(const _NavItem(AppStrings.navNotifications, Icons.notifications_active_rounded, '/notifications'));
-      managementItems.add(const _NavItem('Comparison', Icons.compare_arrows_rounded, '/comparison'));
-    } else if (role == 'HR' || role == 'Supervisor') {
-      managementItems.add(const _NavItem(AppStrings.navReports, Icons.assignment_rounded, '/reports'));
-      managementItems.add(const _NavItem(AppStrings.navNotifications, Icons.notifications_active_rounded, '/notifications'));
+      managementItems.add(_NavItem(
+        AppStrings.navDocuments,
+        Icons.folder_shared_rounded,
+        '/documents',
+        isLocked: !isModuleEnabled(CompanyModules.documents),
+      ));
+    }
+
+    final notificationsLocked = !isModuleEnabled(CompanyModules.notifications);
+    if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
+      managementItems.add(_NavItem(AppStrings.navNotifications, Icons.notifications_active_rounded, '/notifications', isLocked: notificationsLocked));
     } else {
-      // Employee
-      managementItems.add(const _NavItem(AppStrings.navNotifications, Icons.notifications_rounded, '/notifications'));
+      managementItems.add(_NavItem(AppStrings.navNotifications, Icons.notifications_rounded, '/notifications', isLocked: notificationsLocked));
+    }
+
+    if (role == 'Owner') {
+      managementItems.add(_NavItem(
+        'Comparison',
+        Icons.compare_arrows_rounded,
+        '/comparison',
+        isLocked: !isModuleEnabled(CompanyModules.comparison),
+      ));
     }
 
     if (managementItems.isNotEmpty) {
@@ -198,8 +262,7 @@ class ERPDrawer extends ConsumerWidget {
     if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
       accountItems.add(const _NavItem(AppStrings.navSettings, Icons.settings_applications_rounded, '/settings'));
     } else {
-      // Employee
-      accountItems.add(const _NavItem(AppStrings.navProfile, Icons.person_rounded, '/settings')); // Profile goes to settings route
+      accountItems.add(const _NavItem(AppStrings.navProfile, Icons.person_rounded, '/settings'));
     }
 
     children.add(_buildSectionHeader('ACCOUNT'));
@@ -272,7 +335,11 @@ class ERPDrawer extends ConsumerWidget {
     final Color textColor;
     final Color? tileColor;
 
-    if (isSelected) {
+    if (item.isLocked) {
+      iconColor = theme.disabledColor;
+      textColor = theme.disabledColor;
+      tileColor = null;
+    } else if (isSelected) {
       iconColor = isDark ? theme.colorScheme.primary : AppColors.primaryLight;
       textColor = isDark ? theme.colorScheme.primary : AppColors.primaryLight;
       tileColor = isDark ? theme.colorScheme.primary.withOpacity(0.08) : AppColors.primaryLight.withOpacity(0.08);
@@ -289,80 +356,92 @@ class ERPDrawer extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-        leading: Icon(
-          item.icon,
-          color: iconColor,
-          size: 22,
-        ),
-        title: Text(
-          item.title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: textColor,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          leading: Icon(
+            item.icon,
+            color: iconColor,
+            size: 22,
           ),
-        ),
-        dense: true,
-        onTap: () {
-          // Close the drawer if it's a mobile drawer
-          // check if we are in a mobile environment or desktop
-          final ScaffoldState? scaffold = Scaffold.maybeOf(context);
-          if (scaffold != null && scaffold.isDrawerOpen) {
-            Navigator.of(context).pop();
-          }
-
-          if (item.title == AppStrings.navDashboard) {
-            // Dashboard navigation handles its own routing based on role or is resolved
-            if (role == 'Owner') {
-              context.go('/owner-dashboard');
-            } else if (role == 'HR' || role == 'Supervisor') {
-              context.go('/hr-dashboard');
-            } else {
-              context.go('/employee-dashboard');
+          title: Text(
+            item.title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected && !item.isLocked ? FontWeight.bold : FontWeight.w500,
+              color: textColor,
+            ),
+          ),
+          trailing: item.isLocked
+              ? Icon(
+                  Icons.lock_outline_rounded,
+                  color: theme.disabledColor,
+                  size: 16,
+                )
+              : null,
+          dense: true,
+          onTap: () {
+            final ScaffoldState? scaffold = Scaffold.maybeOf(context);
+            if (scaffold != null && scaffold.isDrawerOpen) {
+              Navigator.of(context).pop();
             }
-          } else if (item.title == AppStrings.navEmployees) {
-            context.push('/employees');
-          } else if (item.title == AppStrings.navAttendance || item.title == 'My Attendance') {
-            context.push('/attendance');
-          } else if (item.title == AppStrings.navTasks) {
-            context.push('/tasks');
-          } else if (item.title == 'My Tasks') {
-            context.push('/tasks/my-tasks');
-          } else if (item.title == AppStrings.navLeaveApproval || item.title == 'Leaves Portal' || item.title == 'Apply Leave') {
-            context.push('/leaves');
-          } else if (item.title == AppStrings.navNotifications) {
-            context.push('/notifications');
-          } else if (item.title == 'Machines') {
-            context.push('/machines');
-          } else if (item.title == 'Tooling') {
-            context.push('/tooling');
-          } else if (item.title == 'Drawings') {
-            context.push('/drawings');
-          } else if (item.title == 'Programs') {
-            context.push('/programs');
-          } else if (item.title == AppStrings.navInventory) {
-            context.push('/inventory');
-          } else if (item.title == AppStrings.navProduction) {
-            context.push('/production');
-          } else if (item.title == AppStrings.navPurchase) {
-            context.push('/purchase');
-          } else if (item.title == AppStrings.navSales) {
-            context.push('/sales');
-          } else if (item.title == 'Billing') {
-            context.push('/billing');
-          } else if (item.title == 'Comparison') {
-            context.push('/comparison');
-          } else if (item.title == AppStrings.navSettings || item.title == AppStrings.navProfile) {
-            context.push('/settings');
-          } else if (item.title == AppStrings.navReports || item.title == AppStrings.navAnalytics) {
-            context.push('/reports');
-          } else {
-            _showTodoDialog(context, item.title, role);
-          }
-        },
+
+            if (item.isLocked) {
+              context.push('/feature-locked?module=${item.title}');
+              return;
+            }
+
+            if (item.title == AppStrings.navDashboard) {
+              if (role == 'Owner') {
+                context.go('/owner-dashboard');
+              } else if (role == 'HR' || role == 'Supervisor') {
+                context.go('/hr-dashboard');
+              } else {
+                context.go('/employee-dashboard');
+              }
+            } else if (item.title == AppStrings.navEmployees) {
+              context.push('/employees');
+            } else if (item.title == AppStrings.navAttendance || item.title == 'My Attendance') {
+              context.push('/attendance');
+            } else if (item.title == AppStrings.navTasks) {
+              context.push('/tasks');
+            } else if (item.title == 'My Tasks') {
+              context.push('/tasks/my-tasks');
+            } else if (item.title == AppStrings.navLeaveApproval || item.title == 'Leaves Portal' || item.title == 'Apply Leave') {
+              context.push('/leaves');
+            } else if (item.title == AppStrings.navNotifications) {
+              context.push('/notifications');
+            } else if (item.title == 'Machines') {
+              context.push('/machines');
+            } else if (item.title == 'Tooling') {
+              context.push('/tooling');
+            } else if (item.title == 'Drawings') {
+              context.push('/drawings');
+            } else if (item.title == 'Programs') {
+              context.push('/programs');
+            } else if (item.title == AppStrings.navInventory) {
+              context.push('/inventory');
+            } else if (item.title == AppStrings.navProduction) {
+              context.push('/production');
+            } else if (item.title == AppStrings.navPurchase) {
+              context.push('/purchase');
+            } else if (item.title == AppStrings.navSales) {
+              context.push('/sales');
+            } else if (item.title == 'Billing') {
+              context.push('/billing');
+            } else if (item.title == 'Project Tracker') {
+              context.push('/project-tracker');
+            } else if (item.title == 'Comparison') {
+              context.push('/comparison');
+            } else if (item.title == AppStrings.navSettings || item.title == AppStrings.navProfile) {
+              context.push('/settings');
+            } else if (item.title == AppStrings.navReports || item.title == AppStrings.navAnalytics) {
+              context.push('/reports');
+            } else {
+              _showTodoDialog(context, item.title, role);
+            }
+          },
+        ),
       ),
-    ),);
+    );
   }
 
   void _showTodoDialog(BuildContext context, String featureName, String role) {
@@ -415,6 +494,7 @@ class _NavItem {
   final String title;
   final IconData icon;
   final String route;
+  final bool isLocked;
 
-  const _NavItem(this.title, this.icon, this.route);
+  const _NavItem(this.title, this.icon, this.route, {this.isLocked = false});
 }

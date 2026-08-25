@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/domain/models/company_model.dart';
 import '../../domain/models/employee_model.dart';
 
 final employeeSearchQueryProvider = StateProvider<String>((ref) => '');
@@ -10,12 +11,14 @@ final employeeStatusFilterProvider = StateProvider<String?>((ref) => null);
 final employeeLimitProvider = StateProvider<int>((ref) => 15);
 
 const List<String> kDepartments = [
-  'Engineering',
-  'Human Resources',
-  'Sales',
   'Marketing',
-  'Finance',
-  'Operations',
+  'Design',
+  'Purchase',
+  'Machining',
+  'Assembly',
+  'Quality',
+  'Accountant',
+  'General Employee',
 ];
 
 const List<String> kRoles = [
@@ -97,4 +100,33 @@ final employeeStreamProvider = StreamProvider.family<EmployeeModel?, String>((re
         if (!doc.exists || doc.data() == null) return null;
         return EmployeeModel.fromMap(doc.data()!);
       });
+});
+
+final activeEmployeesCountProvider = StreamProvider<int>((ref) {
+  final authState = ref.watch(authProvider);
+  final companyId = authState.user?.companyId;
+  if (companyId == null) {
+    return Stream.value(0);
+  }
+  return FirebaseFirestore.instance
+      .collection('companies')
+      .doc(companyId)
+      .collection('employees')
+      .snapshots()
+      .map((snap) => snap.docs.length);
+});
+
+final currentCompanyStreamProvider = StreamProvider<CompanyModel?>((ref) {
+  final authState = ref.watch(authProvider);
+  final companyId = authState.user?.companyId;
+  if (companyId == null) {
+    return Stream.value(null);
+  }
+  return FirebaseFirestore.instance
+      .collection('companies')
+      .doc(companyId)
+      .snapshots()
+      .map((doc) => doc.exists && doc.data() != null
+          ? CompanyModel.fromMap(doc.data()!, doc.id)
+          : null);
 });

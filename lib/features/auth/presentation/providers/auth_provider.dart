@@ -7,6 +7,7 @@ import '../../../../core/services/firestore_service.dart';
 import '../../../../core/services/storage_service.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/models/user_model.dart';
+import '../../domain/models/company_modules.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../../employee/domain/repositories/employee_repository.dart';
 import '../../../employee/data/repositories/employee_repository_impl.dart';
@@ -34,6 +35,8 @@ class AuthState {
   final UserModel? user;
   final String? companyName;
   final String? companyLogoUrl;
+  final List<String> enabledModules;
+  final String? companyStatus;
 
   AuthState({
     this.isLoggedIn = false,
@@ -41,6 +44,8 @@ class AuthState {
     this.user,
     this.companyName,
     this.companyLogoUrl,
+    this.enabledModules = const [],
+    this.companyStatus,
   });
 
   // Preserve compatibility getters for routes/dashboards
@@ -49,12 +54,20 @@ class AuthState {
   String? get userName => user?.name;
   String? get userId => user?.uid;
 
+  bool get isCompanyActive {
+    if (user?.role == 'super_admin') return true;
+    if (companyStatus == null) return true; // Default to true during initial loading
+    return companyStatus == 'Active' || companyStatus == 'Trial';
+  }
+
   AuthState copyWith({
     bool? isLoggedIn,
     bool? isInitialized,
     UserModel? user,
     String? companyName,
     String? companyLogoUrl,
+    List<String>? enabledModules,
+    String? companyStatus,
   }) {
     return AuthState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
@@ -62,6 +75,8 @@ class AuthState {
       user: user ?? this.user,
       companyName: companyName ?? this.companyName,
       companyLogoUrl: companyLogoUrl ?? this.companyLogoUrl,
+      enabledModules: enabledModules ?? this.enabledModules,
+      companyStatus: companyStatus ?? this.companyStatus,
     );
   }
 }
@@ -70,13 +85,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
   final AuthService _authService;
   StreamSubscription<User?>? _authStateSubscription;
+  StreamSubscription<DocumentSnapshot>? _companySubscription;
 
   AuthNotifier(this._authRepository, this._authService) : super(AuthState()) {
     restoreSession();
   }
 
+  void _listenToCompany(String companyId) {
+    _companySubscription?.cancel();
+    _companySubscription = FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .snapshots()
+        .listen((companyDoc) {
+      if (companyDoc.exists) {
+        final companyName = companyDoc.data()?['companyName'] ?? companyDoc.data()?['name'];
+        final companyLogoUrl = companyDoc.data()?['companyLogoUrl'] as String?;
+        final companyStatus = companyDoc.data()?['status'] as String?;
+        final rawModules = companyDoc.data()?['enabledModules'];
+        final enabledModules = rawModules != null
+            ? List<String>.from(rawModules as List)
+            : List<String>.from(CompanyModules.all);
+
+        state = state.copyWith(
+          companyName: companyName,
+          companyLogoUrl: companyLogoUrl,
+          companyStatus: companyStatus,
+          enabledModules: enabledModules,
+        );
+      }
+    });
+  }
+
   Future<void> restoreSession() async {
     _authStateSubscription?.cancel();
+    _companySubscription?.cancel();
     final completer = Completer<void>();
     _authStateSubscription = _authService.authStateChanges.listen((User? firebaseUser) async {
       if (firebaseUser != null) {
@@ -85,6 +128,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           if (userProfile.status == 'Active' || userProfile.role == 'super_admin') {
             String? companyName;
             String? companyLogoUrl;
+            String? companyStatus;
+            List<String> enabledModules = List<String>.from(CompanyModules.all);
             if (userProfile.role != 'super_admin') {
               final companyDoc = await FirebaseFirestore.instance
                   .collection('companies')
@@ -93,6 +138,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
               if (companyDoc.exists) {
                 companyName = companyDoc.data()?['companyName'] ?? companyDoc.data()?['name'];
                 companyLogoUrl = companyDoc.data()?['companyLogoUrl'] as String?;
+                companyStatus = companyDoc.data()?['status'] as String?;
+                final rawModules = companyDoc.data()?['enabledModules'];
+                if (rawModules != null) {
+                  enabledModules = List<String>.from(rawModules as List);
+                }
               }
             }
             state = AuthState(
@@ -101,7 +151,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
               user: userProfile,
               companyName: companyName,
               companyLogoUrl: companyLogoUrl,
+              enabledModules: enabledModules,
+              companyStatus: companyStatus,
             );
+
+            if (userProfile.role != 'super_admin') {
+              _listenToCompany(userProfile.companyId);
+            }
           } else {
             // Account exists but is not Active
             state = AuthState(isLoggedIn: false, isInitialized: true, user: null);
@@ -161,6 +217,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Fetch company name and logo
       String? companyName;
       String? companyLogoUrl;
+      String? companyStatus;
+      List<String> enabledModules = List<String>.from(CompanyModules.all);
       if (userProfile.role != 'super_admin') {
         final companyDoc = await FirebaseFirestore.instance
             .collection('companies')
@@ -169,6 +227,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (companyDoc.exists) {
           companyName = companyDoc.data()?['companyName'] ?? companyDoc.data()?['name'];
           companyLogoUrl = companyDoc.data()?['companyLogoUrl'] as String?;
+          companyStatus = companyDoc.data()?['status'] as String?;
+          final rawModules = companyDoc.data()?['enabledModules'];
+          if (rawModules != null) {
+            enabledModules = List<String>.from(rawModules as List);
+          }
         }
       }
 
@@ -179,7 +242,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: userProfile,
         companyName: companyName,
         companyLogoUrl: companyLogoUrl,
+        enabledModules: enabledModules,
+        companyStatus: companyStatus,
       );
+
+      if (userProfile.role != 'super_admin') {
+        _listenToCompany(userProfile.companyId);
+      }
       return true;
     } catch (e) {
       rethrow;
@@ -191,6 +260,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    _companySubscription?.cancel();
     await _authRepository.signOut();
     state = AuthState(isLoggedIn: false, isInitialized: true, user: null);
   }
@@ -205,6 +275,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   @override
   void dispose() {
     _authStateSubscription?.cancel();
+    _companySubscription?.cancel();
     super.dispose();
   }
 }

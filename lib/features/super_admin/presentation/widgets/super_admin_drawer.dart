@@ -73,7 +73,10 @@ class SuperAdminDrawer extends ConsumerWidget {
                     style: TextStyle(color: item.enabled ? null : Colors.grey),
                   ),
                   onTap: () {
-                    Navigator.of(context).pop(); // Close drawer
+                    final ScaffoldState? scaffold = Scaffold.maybeOf(context);
+                    if (scaffold != null && scaffold.isDrawerOpen) {
+                      Navigator.of(context).pop(); // Close drawer
+                    }
                     if (item.enabled) {
                       context.push(item.route);
                     } else {

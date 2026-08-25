@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../auth/domain/models/company_model.dart';
+import '../../../auth/domain/models/company_modules.dart';
 import '../providers/super_admin_provider.dart';
 
 class SuperAdminEditCompanyScreen extends ConsumerStatefulWidget {
@@ -33,6 +34,8 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
   late TextEditingController _timezoneController;
   late TextEditingController _workingHoursController;
   late TextEditingController _logoUrlController;
+  late TextEditingController _maxEmployeesController;
+  final List<String> _tempEnabledModules = [];
 
   bool _saving = false;
   bool _initialized = false;
@@ -53,6 +56,7 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
     _timezoneController = TextEditingController();
     _workingHoursController = TextEditingController();
     _logoUrlController = TextEditingController();
+    _maxEmployeesController = TextEditingController();
   }
 
   @override
@@ -69,6 +73,7 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
     _timezoneController.dispose();
     _workingHoursController.dispose();
     _logoUrlController.dispose();
+    _maxEmployeesController.dispose();
     super.dispose();
   }
 
@@ -87,6 +92,9 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
     _timezoneController.text = company.timezone;
     _workingHoursController.text = company.workingHours;
     _logoUrlController.text = company.logoUrl;
+    _maxEmployeesController.text = company.maxEmployees.toString();
+    _tempEnabledModules.clear();
+    _tempEnabledModules.addAll(company.enabledModules);
     _initialized = true;
   }
 
@@ -306,6 +314,54 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
                                 ),
                               ),
                             ),
+                            const SizedBox(height: AppSizes.p16),
+
+                            // Seat Limit
+                            TextFormField(
+                              controller: _maxEmployeesController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Maximum Seat / Employee Limit *',
+                                prefixIcon: const Icon(Icons.people_alt_rounded),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                                ),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) return 'Maximum seat limit is required';
+                                final limit = int.tryParse(val.trim());
+                                if (limit == null || limit <= 0) return 'Enter a valid positive number';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: AppSizes.p16),
+
+                            // Enabled Modules configuration
+                            Text(
+                              'Configure Enabled Modules:',
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: AppSizes.p8),
+                            Wrap(
+                              spacing: 8.0,
+                              runSpacing: 4.0,
+                              children: CompanyModules.all.map((mod) {
+                                final isSelected = _tempEnabledModules.contains(mod);
+                                return FilterChip(
+                                  label: Text(mod.replaceAll('_', ' ').toUpperCase()),
+                                  selected: isSelected,
+                                  onSelected: (checked) {
+                                    setState(() {
+                                      if (checked) {
+                                        _tempEnabledModules.add(mod);
+                                      } else {
+                                        _tempEnabledModules.remove(mod);
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
                             const SizedBox(height: AppSizes.p32),
 
                             // Save button
@@ -368,6 +424,8 @@ class _SuperAdminEditCompanyScreenState extends ConsumerState<SuperAdminEditComp
         timezone: _timezoneController.text.trim(),
         workingHours: _workingHoursController.text.trim(),
         logoUrl: _logoUrlController.text.trim(),
+        maxEmployees: int.parse(_maxEmployeesController.text.trim()),
+        enabledModules: _tempEnabledModules,
         updatedAt: DateTime.now(),
       );
 
