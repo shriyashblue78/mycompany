@@ -124,6 +124,10 @@ class ERPDrawer extends ConsumerWidget {
 
     bool isModuleEnabled(String module) {
       if (role == 'super_admin') return true;
+      if (module == CompanyModules.inwardOutward || module == CompanyModules.billing) {
+        return authState.enabledModules.contains('inward_outward') ||
+            authState.enabledModules.contains('billing');
+      }
       return authState.enabledModules.contains(module);
     }
 
@@ -133,42 +137,40 @@ class ERPDrawer extends ConsumerWidget {
 
     // MAIN Section
     final mainItems = <_NavItem>[];
-    mainItems.add(const _NavItem(AppStrings.navDashboard, Icons.home_rounded, '/-dashboard'));
+    if (role != 'Accountant') {
+      mainItems.add(const _NavItem(AppStrings.navDashboard, Icons.home_rounded, '/-dashboard'));
 
-    if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
-      mainItems.add(_NavItem(
-        AppStrings.navEmployees,
-        Icons.people_rounded,
-        '/employees',
-        isLocked: !isModuleEnabled(CompanyModules.employees),
-      ));
-    }
+      if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
+        mainItems.add(_NavItem(
+          AppStrings.navEmployees,
+          Icons.people_rounded,
+          '/employees',
+          isLocked: !isModuleEnabled(CompanyModules.employees),
+        ));
+      }
 
-    final attendanceLocked = !isModuleEnabled(CompanyModules.attendance);
-    if (role == 'Owner') {
-      mainItems.add(_NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance', isLocked: attendanceLocked));
-    } else if (role == 'HR' || role == 'Supervisor') {
-      mainItems.add(_NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance', isLocked: attendanceLocked));
-    } else {
-      mainItems.add(_NavItem('My Attendance', Icons.fingerprint_rounded, '/attendance', isLocked: attendanceLocked));
-    }
+      final attendanceLocked = !isModuleEnabled(CompanyModules.attendance);
+      if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
+        mainItems.add(_NavItem(AppStrings.navAttendance, Icons.access_time_filled_rounded, '/attendance', isLocked: attendanceLocked));
+      } else {
+        mainItems.add(_NavItem('My Attendance', Icons.fingerprint_rounded, '/attendance', isLocked: attendanceLocked));
+      }
 
-    final tasksLocked = !isModuleEnabled(CompanyModules.tasks);
-    if (role == 'Owner') {
-      mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
-    } else if (role == 'HR' || role == 'Supervisor') {
-      mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
-    } else {
-      mainItems.add(_NavItem('My Tasks', Icons.checklist_rounded, '/tasks', isLocked: tasksLocked));
-    }
+      final tasksLocked = !isModuleEnabled(CompanyModules.tasks);
+      if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
+        mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
+      } else {
+        mainItems.add(_NavItem('My Tasks', Icons.checklist_rounded, '/tasks', isLocked: tasksLocked));
+      }
 
-    final leavesLocked = !isModuleEnabled(CompanyModules.leaves);
-    if (role == 'Owner') {
-      mainItems.add(_NavItem('Leaves Portal', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
-    } else if (role == 'HR' || role == 'Supervisor') {
-      mainItems.add(_NavItem(AppStrings.navLeaveApproval, Icons.approval_rounded, '/leaves', isLocked: leavesLocked));
-    } else {
-      mainItems.add(_NavItem('Apply Leave', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
+      final leavesLocked = !isModuleEnabled(CompanyModules.leaves);
+      if (role == 'Owner') {
+        mainItems.add(_NavItem('Leaves Portal', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
+      } else if (role == 'HR' || role == 'Supervisor') {
+        mainItems.add(_NavItem(AppStrings.navLeaveApproval, Icons.approval_rounded, '/leaves', isLocked: leavesLocked));
+      } else {
+        mainItems.add(_NavItem('Apply Leave', Icons.time_to_leave_rounded, '/leaves', isLocked: leavesLocked));
+      }
     }
 
     if (mainItems.isNotEmpty) {
@@ -180,12 +182,14 @@ class ERPDrawer extends ConsumerWidget {
     // OPERATIONS Section
     final operationsItems = <_NavItem>[];
 
-    operationsItems.add(_NavItem(
-      AppStrings.navProduction,
-      Icons.precision_manufacturing_rounded,
-      '/production',
-      isLocked: !isModuleEnabled(CompanyModules.production),
-    ));
+    if (role != 'Accountant') {
+      operationsItems.add(_NavItem(
+        AppStrings.navProduction,
+        Icons.precision_manufacturing_rounded,
+        '/production',
+        isLocked: !isModuleEnabled(CompanyModules.production),
+      ));
+    }
 
     if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
       operationsItems.add(_NavItem('Machines', Icons.settings_rounded, '/machines', isLocked: !isModuleEnabled(CompanyModules.machines)));
@@ -193,12 +197,16 @@ class ERPDrawer extends ConsumerWidget {
       operationsItems.add(_NavItem('Drawings', Icons.architecture_rounded, '/drawings', isLocked: !isModuleEnabled(CompanyModules.drawings)));
       operationsItems.add(_NavItem('Programs', Icons.code_rounded, '/programs', isLocked: !isModuleEnabled(CompanyModules.programs)));
       operationsItems.add(_NavItem(AppStrings.navInventory, Icons.inventory_2_rounded, '/inventory', isLocked: !isModuleEnabled(CompanyModules.inventory)));
-      operationsItems.add(_NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase', isLocked: !isModuleEnabled(CompanyModules.purchase)));
-      operationsItems.add(_NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales', isLocked: !isModuleEnabled(CompanyModules.sales)));
-      operationsItems.add(_NavItem('Billing', Icons.receipt_long_rounded, '/billing', isLocked: !isModuleEnabled(CompanyModules.billing)));
+      operationsItems.add(_NavItem('Inward / Outward', Icons.swap_horiz_rounded, '/inward-outward', isLocked: !isModuleEnabled(CompanyModules.inwardOutward)));
     }
 
-    if (hasProjectTrackerAccess(authState.user)) {
+    if (role == 'Owner' || role == 'Accountant') {
+      operationsItems.add(_NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase', isLocked: !isModuleEnabled(CompanyModules.purchase)));
+      operationsItems.add(_NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales', isLocked: !isModuleEnabled(CompanyModules.sales)));
+      operationsItems.add(_NavItem('Party Master', Icons.business_rounded, '/parties'));
+    }
+
+    if (role != 'Accountant' && hasProjectTrackerAccess(authState.user)) {
       operationsItems.add(_NavItem(
         'Project Tracker',
         Icons.assignment_turned_in_rounded,
@@ -236,11 +244,7 @@ class ERPDrawer extends ConsumerWidget {
     }
 
     final notificationsLocked = !isModuleEnabled(CompanyModules.notifications);
-    if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
-      managementItems.add(_NavItem(AppStrings.navNotifications, Icons.notifications_active_rounded, '/notifications', isLocked: notificationsLocked));
-    } else {
-      managementItems.add(_NavItem(AppStrings.navNotifications, Icons.notifications_rounded, '/notifications', isLocked: notificationsLocked));
-    }
+    managementItems.add(_NavItem(AppStrings.navNotifications, Icons.notifications_rounded, '/notifications', isLocked: notificationsLocked));
 
     if (role == 'Owner') {
       managementItems.add(_NavItem(
@@ -425,8 +429,10 @@ class ERPDrawer extends ConsumerWidget {
               context.push('/purchase');
             } else if (item.title == AppStrings.navSales) {
               context.push('/sales');
-            } else if (item.title == 'Billing') {
-              context.push('/billing');
+            } else if (item.title == 'Party Master') {
+              context.push('/parties');
+            } else if (item.title == 'Inward / Outward') {
+              context.push('/inward-outward');
             } else if (item.title == 'Project Tracker') {
               context.push('/project-tracker');
             } else if (item.title == 'Comparison') {

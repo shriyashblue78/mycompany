@@ -22,20 +22,21 @@ final companySalesStreamProvider = StreamProvider<List<SaleModel>>((ref) {
   return ref.watch(saleRepositoryProvider).streamSales(companyId);
 });
 
-// Filtered stream of sales
-final filteredSalesProvider = StreamProvider<List<SaleModel>>((ref) {
+// Filtered list of sales (synchronous provider derived from companySalesStreamProvider)
+final filteredSalesProvider = Provider<AsyncValue<List<SaleModel>>>((ref) {
   final salesAsync = ref.watch(companySalesStreamProvider);
   final query = ref.watch(salesSearchQueryProvider).trim().toLowerCase();
 
-  final list = salesAsync.value ?? const [];
-  final filtered = list.where((sale) {
-    if (query.isEmpty) return true;
-    final customerMatch = sale.customerName.toLowerCase().contains(query);
-    final itemMatch = sale.itemName.toLowerCase().contains(query);
-    return customerMatch || itemMatch;
-  }).toList();
-
-  return Stream.value(filtered);
+  return salesAsync.whenData((list) {
+    return list.where((sale) {
+      if (query.isEmpty) return true;
+      final customerMatch = sale.customerName.toLowerCase().contains(query);
+      final itemMatch = sale.itemName.toLowerCase().contains(query);
+      final invoiceMatch = (sale.invoiceNumber ?? '').toLowerCase().contains(query);
+      final saleNumMatch = sale.saleNumber.toLowerCase().contains(query);
+      return customerMatch || itemMatch || invoiceMatch || saleNumMatch;
+    }).toList();
+  });
 });
 
 // Single sale details stream

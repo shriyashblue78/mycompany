@@ -34,16 +34,17 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
 
   String _unit = kInventoryUnits[0];
   String _status = 'Pending';
+  String _approvalStatus = 'Approved';
   DateTime _purchaseDate = DateTime.now();
 
   bool _saving = false;
   bool _initialized = false;
-  String? _originalStatus; // Tracks the initial status before updates
+  String? _originalStatus;
+  PurchaseModel? _existingPurchase;
 
   @override
   void initState() {
     super.initState();
-    // Add listeners to auto-calculate the total
     _quantityController.addListener(_onPriceOrQtyChanged);
     _priceController.addListener(_onPriceOrQtyChanged);
   }
@@ -77,7 +78,9 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
 
     final authState = ref.watch(authProvider);
     final role = authState.selectedRole ?? 'Employee';
-    final isReadOnly = role != 'Owner';
+    final isReadOnly = role != 'Owner' && role != 'Accountant';
+    final isAccountant = role == 'Accountant';
+    final isOwner = role == 'Owner';
 
     if (isEdit && !_initialized) {
       final purchaseDetailsAsync = ref.watch(purchaseDetailsStreamProvider(widget.purchaseId!));
@@ -89,7 +92,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
               body: const Center(child: Text('The requested purchase record could not be found.')),
             );
           }
-          // Populate controllers
+          _existingPurchase = purchase;
           _invoiceNumberController.text = purchase.invoiceNumber ?? '';
           _supplierNameController.text = purchase.supplierName;
           _supplierPhoneController.text = purchase.supplierPhone;
@@ -99,11 +102,12 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
           _remarksController.text = purchase.remarks;
           _unit = purchase.unit;
           _status = purchase.status;
+          _approvalStatus = purchase.approvalStatus;
           _originalStatus = purchase.status;
           _purchaseDate = purchase.purchaseDate;
           _initialized = true;
 
-          return _buildFormScaffold(theme, isEdit, isReadOnly);
+          return _buildFormScaffold(theme, isEdit, isReadOnly, isAccountant, isOwner);
         },
         loading: () => const ResponsiveScaffold(body: Center(child: CircularProgressIndicator())),
         error: (err, stack) => ResponsiveScaffold(
@@ -112,16 +116,15 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
       );
     }
 
-    return _buildFormScaffold(theme, isEdit, isReadOnly);
+    return _buildFormScaffold(theme, isEdit, isReadOnly, isAccountant, isOwner);
   }
 
-  Widget _buildFormScaffold(ThemeData theme, bool isEdit, bool isReadOnly) {
-    // Watch inventory stream to populate autocomplete recommendations
+  Widget _buildFormScaffold(ThemeData theme, bool isEdit, bool isReadOnly, bool isAccountant, bool isOwner) {
     final inventoryItemsAsync = ref.watch(companyInventoryStreamProvider);
     final inventoryItems = inventoryItemsAsync.value ?? [];
     final existingItemNames = inventoryItems.map((item) => item.itemName).toList();
 
-    final titlePrefix = isReadOnly ? 'View' : (isEdit ? 'Edit' : 'Add');
+    final titlePrefix = isReadOnly ? 'View' : (isEdit ? 'Edit' : 'Log');
 
     return ResponsiveScaffold(
       appBar: AppBar(
@@ -154,11 +157,11 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: theme.colorScheme.primary, width: 0.5),
                                 ),
-                                child: Row(
+                                child: const Row(
                                   children: [
-                                    Icon(Icons.info_outline, color: theme.colorScheme.primary),
-                                    const SizedBox(width: 10),
-                                    const Expanded(
+                                    Icon(Icons.info_outline, color: Colors.blue),
+                                    SizedBox(width: 10),
+                                    Expanded(
                                       child: Text(
                                         'You have View Only access to this purchase record.',
                                         style: TextStyle(fontWeight: FontWeight.bold),
@@ -168,13 +171,46 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                 ),
                               ),
 
+                            if (_approvalStatus == 'Pending Approval')
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: AppSizes.p16),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.amber.shade700),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.pending_actions_rounded, color: Colors.amber),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        isOwner
+                                            ? 'Pending Owner Approval. Click "Approve Request" below to approve.'
+                                            : 'This Purchase entry is Pending Owner Approval.',
+                                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                      ),
+                                    ),
+                                    if (isOwner && isEdit) ...[
+                                      ElevatedButton(
+                                        onPressed: _approveByOwner,
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                        child: const Text('Approve', style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
                             // Invoice Number
                             TextFormField(
                               controller: _invoiceNumberController,
                               enabled: !isReadOnly,
                               decoration: InputDecoration(
-                                labelText: 'Invoice Number (Optional)',
-                                hintText: 'e.g., INV-98124',
+                                labelText: 'Invoice / PO Number (Optional)',
+                                hintText: 'e.g., PO-99120',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                 ),
@@ -182,7 +218,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                             ),
                             const SizedBox(height: AppSizes.p16),
 
-                            // Supplier Details
+                            // Supplier Name & Phone
                             ResponsiveFormRow(
                               children: [
                                 TextFormField(
@@ -190,7 +226,6 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                   enabled: !isReadOnly,
                                   decoration: InputDecoration(
                                     labelText: 'Supplier Name *',
-                                    hintText: 'e.g., Acme Fasteners',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
@@ -208,7 +243,6 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                   keyboardType: TextInputType.phone,
                                   decoration: InputDecoration(
                                     labelText: 'Supplier Phone *',
-                                    hintText: 'e.g., 9876543210',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
@@ -224,29 +258,26 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                             ),
                             const SizedBox(height: AppSizes.p16),
 
-                            // Item Name Autocomplete & Unit
+                            // Item Name & Unit
                             ResponsiveFormRow(
                               children: [
                                 LayoutBuilder(
-                                  builder: (context, constraints) => Autocomplete<String>(
+                                  builder: (context, constraints) => RawAutocomplete<String>(
                                     optionsBuilder: (TextEditingValue textEditingValue) {
                                       if (textEditingValue.text.isEmpty) {
                                         return const Iterable<String>.empty();
                                       }
-                                      return existingItemNames.where((option) {
+                                      return existingItemNames.where((String option) {
                                         return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                                       });
                                     },
-                                    onSelected: (selection) {
+                                    onSelected: (String selection) {
                                       _nameController.text = selection;
-                                      final matchingItem = inventoryItems.firstWhere(
-                                        (item) => item.itemName.toLowerCase() == selection.toLowerCase(),
-                                        orElse: () => inventoryItems.first, // fallback
-                                      );
-                                      if (matchingItem.itemName.toLowerCase() == selection.toLowerCase()) {
-                                        setState(() {
-                                          _unit = matchingItem.unit;
-                                        });
+                                      for (final item in inventoryItems) {
+                                        if (item.itemName.toLowerCase().trim() == selection.toLowerCase().trim()) {
+                                          setState(() => _unit = item.unit);
+                                          break;
+                                        }
                                       }
                                     },
                                     fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
@@ -263,7 +294,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                         enabled: !isReadOnly,
                                         decoration: InputDecoration(
                                           labelText: 'Item Name *',
-                                          hintText: 'Search or add item...',
+                                          hintText: 'Search inventory or add...',
                                           border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                           ),
@@ -355,7 +386,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                   enabled: !isReadOnly,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   decoration: InputDecoration(
-                                    labelText: 'Price Per Unit *',
+                                    labelText: 'Price Per Unit (\$) *',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
@@ -366,7 +397,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                     }
                                     final number = double.tryParse(val);
                                     if (number == null || number < 0) {
-                                      return 'Enter number >= 0';
+                                      return 'Enter valid price';
                                     }
                                     return null;
                                   },
@@ -375,28 +406,26 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                             ),
                             const SizedBox(height: AppSizes.p16),
 
-                            // Total Amount display (Read Only)
+                            // Total Display Card
                             Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              padding: const EdgeInsets.all(AppSizes.p16),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.onSurface.withAlpha(10),
-                                borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                                border: Border.all(color: theme.dividerColor.withAlpha(50)),
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                                border: Border.all(color: theme.colorScheme.outlineVariant),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    'Total Amount (Auto-Calculated)',
-                                    style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(180), fontSize: 13),
+                                    'Calculated Total:',
+                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     '\$${_totalAmount.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
+                                    style: theme.textTheme.headlineSmall?.copyWith(
                                       color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
@@ -404,53 +433,50 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                             ),
                             const SizedBox(height: AppSizes.p16),
 
-                            // Purchase Date Picker
-                            InkWell(
-                              onTap: isReadOnly ? null : () => _selectDate(context),
-                              borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  labelText: 'Purchase Date *',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                            // Purchase Date & Status
+                            ResponsiveFormRow(
+                              children: [
+                                InkWell(
+                                  onTap: isReadOnly ? null : () => _selectDate(context),
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: 'Purchase Date *',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('${_purchaseDate.day}/${_purchaseDate.month}/${_purchaseDate.year}'),
+                                        const Icon(Icons.calendar_today_rounded, size: 18),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${_purchaseDate.day}/${_purchaseDate.month}/${_purchaseDate.year}',
-                                      style: const TextStyle(fontSize: 16),
+                                DropdownButtonFormField<String>(
+                                  value: _status,
+                                  disabledHint: Text(_status),
+                                  decoration: InputDecoration(
+                                    labelText: 'Status *',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
-                                    Icon(Icons.calendar_today_rounded, color: theme.colorScheme.primary),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'Pending', child: Text('Pending')),
+                                    DropdownMenuItem(value: 'Received', child: Text('Received')),
+                                    DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
                                   ],
+                                  onChanged: isReadOnly
+                                      ? null
+                                      : (val) {
+                                          if (val != null) {
+                                            setState(() => _status = val);
+                                          }
+                                        },
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: AppSizes.p16),
-
-                            // Status Dropdown
-                            DropdownButtonFormField<String>(
-                              value: _status,
-                              disabledHint: Text(_status),
-                              decoration: InputDecoration(
-                                labelText: 'Status *',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                                ),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                                DropdownMenuItem(value: 'Received', child: Text('Received')),
-                                DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
                               ],
-                              onChanged: isReadOnly
-                                  ? null
-                                  : (val) {
-                                      if (val != null) {
-                                        setState(() => _status = val);
-                                      }
-                                    },
                             ),
                             const SizedBox(height: AppSizes.p16),
 
@@ -469,7 +495,7 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                             ),
                             const SizedBox(height: AppSizes.p32),
 
-                            // Save Button (Only if not read only)
+                            // Action Button
                             if (!isReadOnly)
                               SizedBox(
                                 width: double.infinity,
@@ -483,7 +509,9 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                     ),
                                   ),
                                   child: Text(
-                                    isEdit ? 'Save Changes' : 'Create Purchase',
+                                    isAccountant
+                                        ? (isEdit ? 'Submit Update for Approval' : 'Submit Logged Purchase')
+                                        : (isEdit ? 'Save Logged Purchase' : 'Log Purchase'),
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                                   ),
                                 ),
@@ -513,6 +541,40 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
     }
   }
 
+  Future<void> _approveByOwner() async {
+    if (_existingPurchase == null) return;
+    final authState = ref.read(authProvider);
+    final companyId = authState.user?.companyId;
+    if (companyId == null) return;
+
+    setState(() => _saving = true);
+    try {
+      final purchaseRepo = ref.read(purchaseRepositoryProvider);
+      final approvedPurchase = _existingPurchase!.copyWith(
+        approvalStatus: 'Approved',
+        lastModifiedByUid: authState.user?.uid,
+        lastModifiedByName: authState.user?.name,
+        lastModifiedByRole: 'Owner',
+        updatedAt: DateTime.now(),
+      );
+      await purchaseRepo.updatePurchase(companyId, approvedPurchase);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Purchase record approved successfully!')),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error approving purchase: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -525,12 +587,16 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
       return;
     }
 
+    final role = authState.selectedRole ?? 'Employee';
+    final isAccountant = role == 'Accountant';
+    final isOwner = role == 'Owner';
+
     final inputItemName = _nameController.text.trim();
     final quantity = double.parse(_quantityController.text.trim());
 
     // Fetch existing inventory list to check if item exists
     final inventoryItems = ref.read(companyInventoryStreamProvider).value ?? [];
-    
+
     InventoryItemModel? existingInventoryItem;
     for (final item in inventoryItems) {
       if (item.itemName.toLowerCase().trim() == inputItemName.toLowerCase().trim()) {
@@ -539,74 +605,56 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
       }
     }
 
-    // Determine if we need to update stock
     final transitioningToReceived = _status == 'Received' && _originalStatus != 'Received';
 
-    if (transitioningToReceived) {
+    if (transitioningToReceived && isOwner) {
       if (existingInventoryItem == null) {
-        // Show dialog asking whether to create the item
-        final bool? shouldCreate = await showDialog<bool>(
+        final createInInventory = await showDialog<bool>(
           context: context,
-          barrierDismissible: false,
           builder: (dialogContext) {
             return AlertDialog(
-              title: const Text('Item Not Found in Inventory'),
-              content: Text('This item "$inputItemName" does not exist in Inventory.\nWould you like to create it?'),
+              title: const Text('Add Item to Inventory?'),
+              content: Text('The item "$inputItemName" does not exist in your Inventory.\n\nWould you like to automatically create it in Inventory with stock quantity $quantity $_unit?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('No'),
+                  child: const Text('Skip Inventory Update'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('Yes'),
+                  child: const Text('Add to Inventory'),
                 ),
               ],
             );
           },
         );
 
-        if (shouldCreate == null) return; // Dialog was cancelled/dismissed somehow
-
-        setState(() => _saving = true);
-
-        if (shouldCreate) {
+        if (createInInventory == true) {
           try {
-            // Auto create item in inventory
             final invRepo = ref.read(inventoryRepositoryProvider);
             final newItemId = FirebaseFirestore.instance.collection('companies').doc(companyId).collection('inventory').doc().id;
-            
-            final newInvItem = InventoryItemModel(
+            final newItem = InventoryItemModel(
               itemId: newItemId,
               companyId: companyId,
               itemName: inputItemName,
-              category: 'Others',
-              currentStock: quantity, // Stock initialized with purchase qty
+              category: 'General',
+              currentStock: quantity,
               unit: _unit,
               supplierName: _supplierNameController.text.trim(),
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
               date: DateTime.now(),
-              documentNumber: 'AUTO-PO',
+              documentNumber: 'PO-${(inventoryItems.length + 1).toString().padLeft(4, '0')}',
               partNumber: 'N/A',
-              process: 'Purchase',
+              process: 'Procurement',
               withMaterial: true,
             );
-            
-            await invRepo.createItem(companyId, newInvItem);
+            await invRepo.createItem(companyId, newItem);
           } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to auto-create inventory item: $e')),
-              );
-            }
-            setState(() => _saving = false);
-            return;
+            debugPrint('Failed to auto-create inventory item: $e');
           }
         }
       } else {
-        // Inventory item exists, increase stock
-        setState(() => _saving = true);
         try {
           final invRepo = ref.read(inventoryRepositoryProvider);
           final updatedInvItem = existingInventoryItem.copyWith(
@@ -615,23 +663,16 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
           );
           await invRepo.updateItem(companyId, updatedInvItem);
         } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to update inventory stock: $e')),
-            );
-          }
-          setState(() => _saving = false);
-          return;
+          debugPrint('Failed to add purchased stock to inventory: $e');
         }
       }
-    } else {
-      // Just start saving screen state
-      setState(() => _saving = true);
     }
 
-    // Now save the purchase document itself
+    setState(() => _saving = true);
+
     try {
       final purchaseRepo = ref.read(purchaseRepositoryProvider);
+      final newApprovalStatus = isAccountant ? 'Pending Approval' : 'Approved';
 
       if (widget.purchaseId != null) {
         // Edit Mode
@@ -650,24 +691,30 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
             purchaseDate: _purchaseDate,
             remarks: _remarksController.text.trim(),
             status: _status,
+            approvalStatus: newApprovalStatus,
+            lastModifiedByUid: authState.user?.uid,
+            lastModifiedByName: authState.user?.name,
+            lastModifiedByRole: role,
             updatedAt: DateTime.now(),
           );
           await purchaseRepo.updatePurchase(companyId, updatedPurchase);
 
-          // Trigger notification
-          await ref.read(notificationServiceProvider).notifyPurchaseAddedOrReceived(
-            companyId: companyId,
-            purchaseId: updatedPurchase.purchaseId,
-            purchaseNumber: updatedPurchase.purchaseNumber,
-            itemName: updatedPurchase.itemName,
-            supplierName: updatedPurchase.supplierName,
-            status: updatedPurchase.status,
-            userUid: authState.user?.uid ?? '',
-            userName: authState.user?.name ?? 'System',
-          );
+          if (isAccountant) {
+            await ref.read(notificationServiceProvider).notifyPurchaseApprovalRequested(
+              companyId: companyId,
+              purchaseId: updatedPurchase.purchaseId,
+              purchaseNumber: updatedPurchase.purchaseNumber,
+              itemName: updatedPurchase.itemName,
+              supplierName: updatedPurchase.supplierName,
+              totalAmount: updatedPurchase.totalAmount,
+              userUid: authState.user?.uid ?? '',
+              userName: authState.user?.name ?? 'Accountant',
+              isUpdate: true,
+            );
+          }
         }
       } else {
-        // Create Mode - Auto generate purchase number PUR-XXXX
+        // Create Mode
         final existingPurchases = ref.read(companyPurchasesStreamProvider).value ?? [];
         int nextNum = 1;
         for (final p in existingPurchases) {
@@ -695,31 +742,39 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
           purchaseDate: _purchaseDate,
           remarks: _remarksController.text.trim(),
           status: _status,
+          approvalStatus: newApprovalStatus,
+          createdByUid: authState.user?.uid,
+          createdByName: authState.user?.name,
+          createdByRole: role,
+          lastModifiedByUid: authState.user?.uid,
+          lastModifiedByName: authState.user?.name,
+          lastModifiedByRole: role,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
 
         await purchaseRepo.createPurchase(companyId, newPurchase);
 
-        // Trigger notification
-        await ref.read(notificationServiceProvider).notifyPurchaseAddedOrReceived(
-          companyId: companyId,
-          purchaseId: newPurchase.purchaseId,
-          purchaseNumber: newPurchase.purchaseNumber,
-          itemName: newPurchase.itemName,
-          supplierName: newPurchase.supplierName,
-          status: newPurchase.status,
-          userUid: authState.user?.uid ?? '',
-          userName: authState.user?.name ?? 'System',
-        );
+        if (isAccountant) {
+          await ref.read(notificationServiceProvider).notifyPurchaseApprovalRequested(
+            companyId: companyId,
+            purchaseId: newPurchase.purchaseId,
+            purchaseNumber: newPurchase.purchaseNumber,
+            itemName: newPurchase.itemName,
+            supplierName: newPurchase.supplierName,
+            totalAmount: newPurchase.totalAmount,
+            userUid: authState.user?.uid ?? '',
+            userName: authState.user?.name ?? 'Accountant',
+            isUpdate: false,
+          );
+        }
       }
 
-
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.purchaseId != null ? 'Purchase updated successfully.' : 'Purchase created successfully.')),
-        );
+        final message = isAccountant
+            ? 'Purchase submitted for Owner approval.'
+            : (widget.purchaseId != null ? 'Purchase updated successfully.' : 'Purchase logged successfully.');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
         context.pop();
       }
     } catch (e) {

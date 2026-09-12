@@ -1,11 +1,14 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/services/storage_service.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/responsive_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -38,13 +41,20 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
   late final TextEditingController _designationController;
   late final TextEditingController _passwordController;
   late final TextEditingController _confirmPasswordController;
+  late final TextEditingController _panCardController;
+  late final TextEditingController _aadhaarCardController;
+  late final TextEditingController _permanentAddressController;
+  late final TextEditingController _currentAddressController;
+  late final TextEditingController _alternatePhoneController;
 
   // Selected State variables
   String? _selectedDept;
   String? _selectedRole;
   String _selectedStatus = 'Active';
   DateTime _joiningDate = DateTime.now();
-  String? _selectedAvatarUrl;
+  String? _selectedPhotoUrl;
+  Uint8List? _imageBytes;
+  bool _isUploadingImage = false;
 
   bool _isLoading = false;
   bool _isEditMode = false;
@@ -71,6 +81,11 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _designationController = TextEditingController();
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+    _panCardController = TextEditingController();
+    _aadhaarCardController = TextEditingController();
+    _permanentAddressController = TextEditingController();
+    _currentAddressController = TextEditingController();
+    _alternatePhoneController = TextEditingController();
 
     if (_isEditMode) {
       _prepopulateForm();
@@ -91,7 +106,69 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _selectedRole = emp.role;
       _selectedStatus = emp.status;
       _joiningDate = emp.joiningDate;
-      _selectedAvatarUrl = emp.photoUrl;
+      _selectedPhotoUrl = emp.photoUrl;
+      _panCardController.text = emp.panCardNumber;
+      _aadhaarCardController.text = emp.aadhaarCardNumber;
+      _permanentAddressController.text = emp.permanentAddress;
+      _currentAddressController.text = emp.currentAddress;
+      _alternatePhoneController.text = emp.alternatePhone;
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    final authState = ref.read(authProvider);
+    final companyId = authState.user?.companyId;
+    if (companyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unauthorized: Company context missing')),
+      );
+      return;
+    }
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 600,
+      );
+
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _imageBytes = bytes;
+        _isUploadingImage = true;
+      });
+
+      final empId = _idController.text.trim().isNotEmpty
+          ? _idController.text.trim()
+          : 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      final fileName = 'employee_${empId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storagePath = 'companies/$companyId/employees/$fileName';
+
+      final storageService = ref.read(storageServiceProvider);
+      final downloadUrl = await storageService.uploadBytes(
+        path: storagePath,
+        bytes: bytes,
+        contentType: image.mimeType ?? 'image/jpeg',
+      );
+
+      if (mounted) {
+        setState(() {
+          _selectedPhotoUrl = downloadUrl;
+          _isUploadingImage = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick/upload photo: $e')),
+        );
+      }
     }
   }
 
@@ -110,6 +187,11 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     _designationController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _panCardController.dispose();
+    _aadhaarCardController.dispose();
+    _permanentAddressController.dispose();
+    _currentAddressController.dispose();
+    _alternatePhoneController.dispose();
     super.dispose();
   }
 
@@ -170,11 +252,16 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           department: _selectedDept!,
           designation: _designationController.text.trim(),
           status: _selectedStatus,
-          photoUrl: _selectedAvatarUrl,
+          photoUrl: _selectedPhotoUrl,
           joiningDate: _joiningDate,
           createdAt: existingEmp.createdAt,
           updatedAt: DateTime.now(),
           lastLogin: existingEmp.lastLogin,
+          panCardNumber: _panCardController.text.trim(),
+          aadhaarCardNumber: _aadhaarCardController.text.trim(),
+          permanentAddress: _permanentAddressController.text.trim(),
+          currentAddress: _currentAddressController.text.trim(),
+          alternatePhone: _alternatePhoneController.text.trim(),
         );
 
         await repository.updateEmployee(
@@ -239,10 +326,15 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           department: _selectedDept!,
           designation: _designationController.text.trim(),
           status: _selectedStatus,
-          photoUrl: _selectedAvatarUrl,
+          photoUrl: _selectedPhotoUrl,
           joiningDate: _joiningDate,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
+          panCardNumber: _panCardController.text.trim(),
+          aadhaarCardNumber: _aadhaarCardController.text.trim(),
+          permanentAddress: _permanentAddressController.text.trim(),
+          currentAddress: _currentAddressController.text.trim(),
+          alternatePhone: _alternatePhoneController.text.trim(),
         );
 
         await repository.createEmployee(
@@ -291,7 +383,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       children: [
         ResponsiveScaffold(
           appBar: AppBar(
-            title: Text(_isEditMode ? 'Edit Employee' : 'Add Employee'),
+            title: Text(_isEditMode ? 'Edit Workforce' : 'Add Workforce'),
             elevation: 0,
             backgroundColor: theme.colorScheme.surface,
             iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
@@ -342,65 +434,157 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                         const SizedBox(height: AppSizes.p20),
                       ],
 
-                      // Avatar Selection
+                      // Employee Photo Selection
                       Text(
-                        'Select Profile Picture',
+                        'Employee Photo',
                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: AppSizes.p8),
-                      SizedBox(
-                        height: 70,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedAvatarUrl = null;
-                                });
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 12),
-                                width: 60,
+                      Row(
+                        children: [
+                          Stack(
+                            children: [
+                              Container(
+                                width: 80,
+                                height: 80,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: _selectedAvatarUrl == null
-                                        ? theme.colorScheme.primary
-                                        : Colors.grey.shade300,
-                                    width: _selectedAvatarUrl == null ? 3.0 : 1.0,
+                                    color: theme.colorScheme.primary,
+                                    width: 2,
                                   ),
                                   color: isDark ? Colors.white.withAlpha(20) : Colors.grey.shade100,
                                 ),
-                                child: Icon(Icons.person_outline_rounded, color: Colors.grey.shade600),
+                                child: ClipOval(
+                                  child: _imageBytes != null
+                                      ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                      : (_selectedPhotoUrl != null && _selectedPhotoUrl!.isNotEmpty
+                                          ? Image.network(
+                                              _selectedPhotoUrl!,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Icon(
+                                                Icons.person_rounded,
+                                                size: 40,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                            )
+                                          : Icon(
+                                              Icons.person_rounded,
+                                              size: 40,
+                                              color: Colors.grey.shade500,
+                                            )),
+                                ),
                               ),
-                            ),
-                            ..._avatars.map((url) {
-                              final isSelected = _selectedAvatarUrl == url;
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedAvatarUrl = url;
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 12),
-                                  width: 60,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isSelected ? theme.colorScheme.primary : Colors.grey.shade300,
-                                      width: isSelected ? 3.0 : 1.0,
+                              if (_isUploadingImage)
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black38,
+                                      shape: BoxShape.circle,
                                     ),
-                                    image: DecorationImage(
-                                      image: NetworkImage(url),
-                                      fit: BoxFit.cover,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                     ),
                                   ),
                                 ),
-                              );
-                            }),
-                          ],
+                            ],
+                          ),
+                          const SizedBox(width: AppSizes.p16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _isUploadingImage
+                                          ? null
+                                          : () => _pickAndUploadPhoto(ImageSource.gallery),
+                                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                                      label: const Text('Gallery'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSizes.p8),
+                                    OutlinedButton.icon(
+                                      onPressed: _isUploadingImage
+                                          ? null
+                                          : () => _pickAndUploadPhoto(ImageSource.camera),
+                                      icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                                      label: const Text('Camera'),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_selectedPhotoUrl != null && _selectedPhotoUrl!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedPhotoUrl = null;
+                                        _imageBytes = null;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                    label: const Text('Remove Photo', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.p12),
+                      Text(
+                        'Or choose a default avatar:',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: AppSizes.p8),
+                      SizedBox(
+                        height: 50,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: _avatars.map((url) {
+                            final isSelected = _selectedPhotoUrl == url && _imageBytes == null;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedPhotoUrl = url;
+                                  _imageBytes = null;
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 10),
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected ? theme.colorScheme.primary : Colors.grey.shade300,
+                                    width: isSelected ? 2.5 : 1.0,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ),
                       const SizedBox(height: AppSizes.p24),
@@ -484,6 +668,77 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                            }
                            return null;
                          },
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // Alternate Contact Number
+                      _buildLabel('Alternate Contact Number (Optional)'),
+                      TextFormField(
+                        controller: _alternatePhoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. +91 9876543210',
+                          prefixIcon: Icon(Icons.phone_forwarded_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // PAN & Aadhaar Card Numbers
+                      ResponsiveFormRow(
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('PAN Card Number (Optional)'),
+                              TextFormField(
+                                controller: _panCardController,
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: const InputDecoration(
+                                  hintText: 'e.g. ABCDE1234F',
+                                  prefixIcon: Icon(Icons.credit_card_rounded),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel('Aadhaar Card Number (Optional)'),
+                              TextFormField(
+                                controller: _aadhaarCardController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  hintText: 'e.g. 1234 5678 9012',
+                                  prefixIcon: Icon(Icons.fingerprint_rounded),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // Current Address
+                      _buildLabel('Current Address (Optional)'),
+                      TextFormField(
+                        controller: _currentAddressController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter current residential address...',
+                          prefixIcon: Icon(Icons.home_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // Permanent Address
+                      _buildLabel('Permanent Address (Optional)'),
+                      TextFormField(
+                        controller: _permanentAddressController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter permanent home address...',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
                       ),
                       const SizedBox(height: AppSizes.p16),
 

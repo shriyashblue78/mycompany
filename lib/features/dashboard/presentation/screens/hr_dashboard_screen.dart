@@ -465,7 +465,7 @@ class HRDashboardScreen extends ConsumerWidget {
       cards.add(_StatCardData('Running Production', '${stats.runningProduction}', Icons.precision_manufacturing_rounded, Colors.purple));
     }
     if (isEnabled('purchase')) {
-      cards.add(_StatCardData('Today\'s Purchases', '\$${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal));
+      cards.add(_StatCardData('Today\'s Purchases', '₹${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal));
     }
     if (isEnabled('sales')) {
       cards.add(_StatCardData('Today\'s Sales', '₹${stats.todaySalesAmount.toStringAsFixed(0)}', Icons.monetization_on_rounded, Colors.amber));
@@ -559,10 +559,8 @@ class HRDashboardScreen extends ConsumerWidget {
             : 6;
 
     final actions = [
-      _ActionData('Add Employee', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
-      _ActionData('Add Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
+      _ActionData('Add Workforce', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
       _ActionData('Add Production', Icons.add_box_rounded, Colors.purple, () => context.push('/production/create')),
-      _ActionData('Add Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
       _ActionData('Inventory', Icons.inventory_2_rounded, Colors.red, () => context.push('/inventory')),
       _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
       _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),

@@ -58,7 +58,7 @@ class EmployeeListScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: isLimitReached ? null : () => context.push('/employees/add'),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Employee'),
+        label: const Text('Add Workforce'),
         backgroundColor: isLimitReached ? theme.disabledColor : theme.colorScheme.primary,
         foregroundColor: isLimitReached ? theme.disabledColor.withAlpha(128) : Colors.white,
       ),
@@ -732,25 +732,7 @@ class EmployeeListScreen extends ConsumerWidget {
             title: emp.name,
             subtitle: '${emp.role} · ${emp.department}',
             meta: emp.email,
-            leading: CircleAvatar(
-              radius: 22,
-              backgroundColor:
-                  Theme.of(context).colorScheme.primary.withOpacity(0.12),
-              backgroundImage:
-                  emp.photoUrl != null ? NetworkImage(emp.photoUrl!) : null,
-              child: emp.photoUrl == null
-                  ? Text(
-                      emp.name.isNotEmpty
-                          ? emp.name[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 16,
-                      ),
-                    )
-                  : null,
-            ),
+            leading: _buildAvatar(emp, 44),
             statusLabel: emp.status,
             statusColor: isActive ? AppColors.success : Colors.grey,
             onTap: () => context.push('/employees/${emp.employeeId}'),
@@ -889,22 +871,8 @@ class EmployeeListScreen extends ConsumerWidget {
   }
 
   Widget _buildAvatar(EmployeeModel employee, double size) {
-    if (employee.photoUrl != null && employee.photoUrl!.isNotEmpty) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          image: DecorationImage(
-            image: NetworkImage(employee.photoUrl!),
-            fit: BoxFit.cover,
-          ),
-        ),
-      );
-    }
-
     final initials = employee.name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase();
-    return Container(
+    final fallbackAvatar = Container(
       width: size,
       height: size,
       decoration: const BoxDecoration(
@@ -914,14 +882,32 @@ class EmployeeListScreen extends ConsumerWidget {
       child: Center(
         child: Text(
           initials.isNotEmpty ? initials : 'E',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: size * 0.35,
           ),
         ),
       ),
     );
+
+    if (employee.photoUrl != null && employee.photoUrl!.isNotEmpty) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: ClipOval(
+          child: Image.network(
+            employee.photoUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return fallbackAvatar;
+            },
+          ),
+        ),
+      );
+    }
+
+    return fallbackAvatar;
   }
 
   Widget _buildStatusBadge(bool isActive) {

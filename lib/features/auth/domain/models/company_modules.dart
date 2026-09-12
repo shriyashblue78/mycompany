@@ -11,7 +11,8 @@ class CompanyModules {
   static const String inventory = 'inventory';
   static const String purchase = 'purchase';
   static const String sales = 'sales';
-  static const String billing = 'billing';
+  static const String inwardOutward = 'inward_outward';
+  static const String billing = 'billing'; // Retained key alias for backward compatibility
   static const String reports = 'reports';
   static const String documents = 'documents';
   static const String notifications = 'notifications';
@@ -33,7 +34,7 @@ class CompanyModules {
     lowStock,
     purchase,
     sales,
-    billing,
+    inwardOutward,
     reports,
     documents,
     notifications,

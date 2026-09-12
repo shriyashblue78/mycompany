@@ -24,4 +24,7 @@ abstract class NotificationRepository {
 
   /// Marks all specified notifications as read for a given employee
   Future<void> markAllAsRead(String companyId, String employeeId, List<String> notificationIds);
+
+  /// Deletes all notifications for the given company
+  Future<void> deleteAllNotifications(String companyId);
 }

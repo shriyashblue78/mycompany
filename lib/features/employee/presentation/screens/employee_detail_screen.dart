@@ -292,23 +292,8 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
   }
 
   Widget _buildAvatar(EmployeeModel employee, double size) {
-    if (employee.photoUrl != null && employee.photoUrl!.isNotEmpty) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.primaryLight, width: 3),
-          image: DecorationImage(
-            image: NetworkImage(employee.photoUrl!),
-            fit: BoxFit.cover,
-          ),
-        ),
-      );
-    }
-
     final initials = employee.name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase();
-    return Container(
+    final fallbackAvatar = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -327,6 +312,26 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
         ),
       ),
     );
+
+    if (employee.photoUrl != null && employee.photoUrl!.isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.primaryLight, width: 3),
+        ),
+        child: ClipOval(
+          child: Image.network(
+            employee.photoUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => fallbackAvatar,
+          ),
+        ),
+      );
+    }
+
+    return fallbackAvatar;
   }
 
   Widget _buildDetailsGrid(BuildContext context, EmployeeModel employee, bool isDark) {
@@ -339,6 +344,16 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
       _DetailItem('Employee ID', employee.employeeId, Icons.badge_outlined),
       _DetailItem('Email Address', employee.email, Icons.email_outlined),
       _DetailItem('Phone Number', employee.phone, Icons.phone_outlined),
+      if (employee.alternatePhone.isNotEmpty)
+        _DetailItem('Alternate Phone', employee.alternatePhone, Icons.phone_forwarded_outlined),
+      if (employee.panCardNumber.isNotEmpty)
+        _DetailItem('PAN Card Number', employee.panCardNumber, Icons.credit_card_rounded),
+      if (employee.aadhaarCardNumber.isNotEmpty)
+        _DetailItem('Aadhaar Card Number', employee.aadhaarCardNumber, Icons.fingerprint_rounded),
+      if (employee.currentAddress.isNotEmpty)
+        _DetailItem('Current Address', employee.currentAddress, Icons.home_outlined),
+      if (employee.permanentAddress.isNotEmpty)
+        _DetailItem('Permanent Address', employee.permanentAddress, Icons.location_on_outlined),
       _DetailItem('Department', employee.department, Icons.corporate_fare_rounded),
       _DetailItem('Designation', employee.designation, Icons.work_outline_rounded),
       _DetailItem('System Role', employee.role, Icons.security_rounded),

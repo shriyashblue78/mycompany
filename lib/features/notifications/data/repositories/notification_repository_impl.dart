@@ -123,4 +123,21 @@ class NotificationRepositoryImpl implements NotificationRepository {
       await batch.commit();
     }
   }
+
+  @override
+  Future<void> deleteAllNotifications(String companyId) async {
+    final snapshot = await _firestore
+        .collection('companies')
+        .doc(companyId)
+        .collection('notifications')
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
 }

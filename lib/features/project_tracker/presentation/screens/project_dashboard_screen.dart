@@ -123,28 +123,35 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
       ),
       drawer: const ERPDrawer(),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Stats Cards Header
-              _buildStatsHeader(theme, isDark),
-              const SizedBox(height: AppSizes.p12),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSizes.p16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Stats Cards Header
+                _buildStatsHeader(theme, isDark),
+                const SizedBox(height: AppSizes.p12),
 
-              // 2. View Toggle Controls (Focus Area)
-              _buildViewSelector(user, role, theme, isDark),
-              const SizedBox(height: AppSizes.p12),
+                // 2. View Toggle Controls (Focus Area)
+                _buildViewSelector(user, role, theme, isDark),
+                const SizedBox(height: AppSizes.p12),
 
-              // 3. Search & Filter controls
-              _buildFilterControls(context, theme, isDark),
-              const SizedBox(height: AppSizes.p12),
+                // 3. Search & Filter controls
+                _buildFilterControls(context, theme, isDark),
+                const SizedBox(height: AppSizes.p12),
 
-              // 4. Responsive List/Table
-              Expanded(
-                child: projectsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, stack) => Center(child: Text('Error loading projects: $err')),
+                // 4. Responsive List/Table
+                projectsAsync.when(
+                  loading: () => const Center(child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  )),
+                  error: (err, stack) => Center(child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Text('Error loading projects: $err'),
+                  )),
                   data: (projects) {
                     final activeProjects = _selectedDepartment == 'All'
                         ? projects
@@ -152,19 +159,22 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
 
                     if (activeProjects.isEmpty) {
                       return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.assignment_late_outlined, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 12),
-                            Text(
-                              _selectedDepartment == 'All'
-                                  ? 'No projects found'
-                                  : 'No active projects currently at $_selectedDepartment stage',
-                              style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.assignment_late_outlined, size: 64, color: Colors.grey.shade400),
+                              const SizedBox(height: 12),
+                              Text(
+                                _selectedDepartment == 'All'
+                                    ? 'No projects found'
+                                    : 'No active projects currently at $_selectedDepartment stage',
+                                style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     }
@@ -181,18 +191,16 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
                           _buildWorkflowPipeline(projects, theme, isDark),
                           const SizedBox(height: AppSizes.p12),
                         ],
-                        Expanded(
-                          child: ResponsiveLayout(
-                            mobile: _selectedDepartment == 'All'
-                                ? _buildMobileTable(context, activeProjects, user, theme, isDark)
-                                : _buildMobileDepartmentCards(context, activeProjects, drawings, user, theme, isDark),
-                            tablet: _selectedDepartment == 'All'
-                                ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
-                                : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
-                            desktop: _selectedDepartment == 'All'
-                                ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
-                                : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
-                          ),
+                        ResponsiveLayout(
+                          mobile: _selectedDepartment == 'All'
+                              ? _buildMobileTable(context, activeProjects, user, theme, isDark)
+                              : _buildMobileDepartmentCards(context, activeProjects, drawings, user, theme, isDark),
+                          tablet: _selectedDepartment == 'All'
+                              ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
+                              : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
+                          desktop: _selectedDepartment == 'All'
+                              ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
+                              : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
                         ),
                         if (_selectedDepartment == 'All') ...[
                           _buildPaginationRow(activeProjects.length, theme, isDark),
@@ -201,8 +209,8 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
                     );
                   },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

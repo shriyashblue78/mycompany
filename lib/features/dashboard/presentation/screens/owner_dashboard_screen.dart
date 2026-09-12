@@ -293,11 +293,11 @@ class OwnerDashboardScreen extends ConsumerWidget {
 
   Widget _buildMobileQuickActions(BuildContext context) {
     final actions = [
-      _ActionData('Add Employee', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
-      _ActionData('Add Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
+      _ActionData('Add Workforce', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
+      _ActionData('Log Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
       _ActionData('Add Production', Icons.add_box_rounded, Colors.purple, () => context.push('/production/create')),
-      _ActionData('Add Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
-      _ActionData('Billing', Icons.receipt_long_rounded, Colors.deepPurple, () => context.push('/billing')),
+      _ActionData('Log Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
+      _ActionData('Inward / Outward', Icons.swap_horiz_rounded, Colors.deepPurple, () => context.push('/inward-outward')),
       _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
     ];
     return GridView.count(
@@ -480,7 +480,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
       cards.add(_StatCardData('Running Production', '${stats.runningProduction}', Icons.precision_manufacturing_rounded, Colors.purple));
     }
     if (isEnabled('purchase')) {
-      cards.add(_StatCardData("Today's Purchases", '\$${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal));
+      cards.add(_StatCardData("Today's Purchases", '₹${stats.todayPurchasesAmount.toStringAsFixed(2)}', Icons.shopping_cart_rounded, Colors.teal));
     }
     if (isEnabled('sales')) {
       cards.add(_StatCardData("Today's Sales", '₹${stats.todaySalesAmount.toStringAsFixed(0)}', Icons.monetization_on_rounded, Colors.amber));
@@ -557,12 +557,12 @@ class OwnerDashboardScreen extends ConsumerWidget {
   Widget _buildDesktopQuickActions(BuildContext context) {
     final columns = ResponsiveLayout.isTablet(context) ? 3 : 6;
     final actions = [
-      _ActionData('Add Employee', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
-      _ActionData('Add Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
+      _ActionData('Add Workforce', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
+      _ActionData('Log Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
       _ActionData('Add Production', Icons.add_box_rounded, Colors.purple, () => context.push('/production/create')),
-      _ActionData('Add Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
+      _ActionData('Log Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
       _ActionData('Inventory', Icons.inventory_2_rounded, Colors.red, () => context.push('/inventory')),
-      _ActionData('Billing', Icons.receipt_long_rounded, Colors.deepPurple, () => context.push('/billing')),
+      _ActionData('Inward / Outward', Icons.swap_horiz_rounded, Colors.deepPurple, () => context.push('/inward-outward')),
       _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
       _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
     ];

@@ -420,7 +420,65 @@ class NotificationService {
     );
   }
 
+  Future<void> notifyPurchaseApprovalRequested({
+    required String companyId,
+    required String purchaseId,
+    required String purchaseNumber,
+    required String itemName,
+    required String supplierName,
+    required double totalAmount,
+    required String userUid,
+    required String userName,
+    required bool isUpdate,
+  }) async {
+    final action = isUpdate ? 'updated' : 'submitted';
+    final title = 'Purchase Approval Required: $purchaseNumber';
+    final message = 'Accountant $userName $action purchase $purchaseNumber ($itemName) from $supplierName for \$${totalAmount.toStringAsFixed(2)}. Click to review and approve.';
+    await sendNotification(
+      companyId: companyId,
+      title: title,
+      message: message,
+      type: 'Purchase Update',
+      priority: 'High',
+      targetType: 'Company',
+      targetRoles: ['Owner'],
+      createdByUid: userUid,
+      createdByName: userName,
+      relatedDocumentId: purchaseId,
+      actionOrStatus: 'Pending Approval',
+    );
+  }
+
   // --- Sales Events ---
+  Future<void> notifySaleApprovalRequested({
+    required String companyId,
+    required String saleId,
+    required String saleNumber,
+    required String itemName,
+    required String customerName,
+    required double totalAmount,
+    required String userUid,
+    required String userName,
+    required bool isUpdate,
+  }) async {
+    final action = isUpdate ? 'updated' : 'submitted';
+    final title = 'Sale Approval Required: $saleNumber';
+    final message = 'Accountant $userName $action sale $saleNumber ($itemName) for $customerName for \$${totalAmount.toStringAsFixed(2)}. Click to review and approve.';
+    await sendNotification(
+      companyId: companyId,
+      title: title,
+      message: message,
+      type: 'Sales Update',
+      priority: 'High',
+      targetType: 'Company',
+      targetRoles: ['Owner'],
+      createdByUid: userUid,
+      createdByName: userName,
+      relatedDocumentId: saleId,
+      actionOrStatus: 'Pending Approval',
+    );
+  }
+
   Future<void> notifySaleAddedOrDelivered({
     required String companyId,
     required String saleId,
@@ -441,7 +499,7 @@ class NotificationService {
       type: 'Sales Update',
       priority: 'Medium',
       targetType: 'Company',
-      targetRoles: ['Owner', 'HR'],
+      targetRoles: ['Owner'],
       createdByUid: userUid,
       createdByName: userName,
       relatedDocumentId: saleId,

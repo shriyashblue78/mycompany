@@ -14,6 +14,11 @@ class EmployeeModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastLogin;
+  final String panCardNumber;
+  final String aadhaarCardNumber;
+  final String permanentAddress;
+  final String currentAddress;
+  final String alternatePhone;
 
   const EmployeeModel({
     required this.employeeId,
@@ -31,6 +36,11 @@ class EmployeeModel {
     required this.createdAt,
     required this.updatedAt,
     this.lastLogin,
+    this.panCardNumber = '',
+    this.aadhaarCardNumber = '',
+    this.permanentAddress = '',
+    this.currentAddress = '',
+    this.alternatePhone = '',
   });
 
   factory EmployeeModel.fromMap(Map<String, dynamic> map) {
@@ -58,6 +68,11 @@ class EmployeeModel {
       lastLogin: map['lastLogin'] != null
           ? DateTime.parse(map['lastLogin'] as String)
           : null,
+      panCardNumber: (map['panCardNumber'] ?? '') as String,
+      aadhaarCardNumber: (map['aadhaarCardNumber'] ?? '') as String,
+      permanentAddress: (map['permanentAddress'] ?? '') as String,
+      currentAddress: (map['currentAddress'] ?? '') as String,
+      alternatePhone: (map['alternatePhone'] ?? '') as String,
     );
   }
 
@@ -78,6 +93,11 @@ class EmployeeModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'lastLogin': lastLogin?.toIso8601String(),
+      'panCardNumber': panCardNumber,
+      'aadhaarCardNumber': aadhaarCardNumber,
+      'permanentAddress': permanentAddress,
+      'currentAddress': currentAddress,
+      'alternatePhone': alternatePhone,
     };
   }
 
@@ -97,6 +117,11 @@ class EmployeeModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? lastLogin,
+    String? panCardNumber,
+    String? aadhaarCardNumber,
+    String? permanentAddress,
+    String? currentAddress,
+    String? alternatePhone,
   }) {
     return EmployeeModel(
       employeeId: employeeId ?? this.employeeId,
@@ -114,6 +139,11 @@ class EmployeeModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastLogin: lastLogin ?? this.lastLogin,
+      panCardNumber: panCardNumber ?? this.panCardNumber,
+      aadhaarCardNumber: aadhaarCardNumber ?? this.aadhaarCardNumber,
+      permanentAddress: permanentAddress ?? this.permanentAddress,
+      currentAddress: currentAddress ?? this.currentAddress,
+      alternatePhone: alternatePhone ?? this.alternatePhone,
     );
   }
 }

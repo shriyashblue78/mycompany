@@ -71,6 +71,25 @@ service cloud.firestore {
         allow read: if isSameCompany(companyId) && hasRole('Supervisor');
       }
 
+      // Sales Subcollection (Accessible ONLY to Owner and Accountant)
+      match /sales/{saleId} {
+        allow read: if isOwner(companyId) || (isSameCompany(companyId) && hasRole('Accountant'));
+        allow create, update, delete: if isOwner(companyId);
+        allow create, update: if isSameCompany(companyId) && hasRole('Accountant') && request.resource.data.approvalStatus == 'Pending Approval';
+      }
+
+      // Purchases Subcollection (Accessible ONLY to Owner and Accountant)
+      match /purchases/{purchaseId} {
+        allow read: if isOwner(companyId) || (isSameCompany(companyId) && hasRole('Accountant'));
+        allow create, update, delete: if isOwner(companyId);
+        allow create, update: if isSameCompany(companyId) && hasRole('Accountant') && request.resource.data.approvalStatus == 'Pending Approval';
+      }
+
+      // Inward / Outward Subcollection
+      match /inward_outward/{id} {
+        allow read, write: if isSameCompany(companyId);
+      }
+
       // Other business data subcollections (tasks, inventory, etc.)
       match /{document=**} {
         allow read, write: if isOwner(companyId);

@@ -1,0 +1,39 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper checking if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper fetching user record from Firestore for company isolation check
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper verifying user belongs to the company folder being accessed
+    function isSameCompany(companyId) {
+      return isSignedIn() && getUserData().companyId == companyId;
+    }
+
+    // Helper checking user role
+    function isOwnerOrAdmin(companyId) {
+      return isSameCompany(companyId) && (getUserData().role == 'Owner' || getUserData().role == 'HR' || getUserData().role == 'Supervisor');
+    }
+
+    // Public / default fallback rules
+    match /{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Strict multi-tenant security for company employees
+    match /companies/{companyId}/employees/{allPaths=**} {
+      // Any authenticated employee from the same company can read employee photos
+      allow read: if isSameCompany(companyId);
+      // Owner/HR/Supervisor or self can write/upload photos
+      allow write: if isOwnerOrAdmin(companyId) || (isSameCompany(companyId) && getUserData().employeeId != null);
+    }
+  }
+}

@@ -57,12 +57,16 @@ import '../../features/production/domain/models/production_model.dart';
 import '../../features/production/presentation/screens/production_list_screen.dart';
 import '../../features/production/presentation/screens/production_form_screen.dart';
 import '../../features/production/presentation/screens/production_detail_screen.dart';
-import '../../features/billing/presentation/screens/billing_placeholder_screen.dart';
+import '../../features/inward_outward/presentation/screens/inward_outward_list_screen.dart';
+import '../../features/inward_outward/presentation/screens/inward_outward_form_screen.dart';
 import '../../features/purchase/presentation/screens/purchase_list_screen.dart';
 import '../../features/purchase/presentation/screens/purchase_form_screen.dart';
 import '../../features/sales/presentation/screens/sales_list_screen.dart';
 import '../../features/sales/presentation/screens/sales_form_screen.dart';
 import '../../features/sales/presentation/screens/sales_analytics_screen.dart';
+import '../../features/sales/presentation/screens/sale_detail_view_screen.dart';
+import '../../features/party/presentation/screens/party_list_screen.dart';
+import '../../features/party/presentation/screens/party_form_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/reports/presentation/screens/reports_home_screen.dart';
 import '../../features/machines/domain/models/machine_model.dart';
@@ -140,9 +144,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         return _getDashboardRoute(currentAuthState.selectedRole);
       }
 
+      // Accountant Role Strict Module Guard (Access ONLY to Sale, Purchase, Notifications, Settings)
+      if (currentAuthState.selectedRole == 'Accountant') {
+        final allowedAccountantRoutes = [
+          '/sales',
+          '/purchase',
+          '/purchases',
+          '/parties',
+          '/notifications',
+          '/settings',
+          '/feature-locked',
+        ];
+        final isAllowed = allowedAccountantRoutes.any((r) => currentRoute.startsWith(r));
+        if (!isAllowed) {
+          return '/sales';
+        }
+      }
+
       // Helper to check module enablement
       bool isModuleEnabled(String module) {
         if (currentAuthState.selectedRole == 'super_admin') return true;
+        if (module == 'inward_outward' || module == 'billing') {
+          return currentAuthState.enabledModules.contains('inward_outward') ||
+              currentAuthState.enabledModules.contains('billing');
+        }
         return currentAuthState.enabledModules.contains(module);
       }
 
@@ -256,9 +281,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 11. Purchase
       final hasPurchaseRolePermission = currentAuthState.selectedRole == 'Owner' ||
-          currentAuthState.selectedRole == 'HR' ||
-          currentAuthState.selectedRole == 'Supervisor';
-      if (currentRoute.startsWith('/purchase')) {
+          currentAuthState.selectedRole == 'Accountant';
+      if (currentRoute.startsWith('/purchase') || currentRoute.startsWith('/purchases')) {
         if (!hasPurchaseRolePermission) {
           return _getDashboardRoute(currentAuthState.selectedRole);
         }
@@ -269,8 +293,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // 12. Sales
       final hasSalesRolePermission = currentAuthState.selectedRole == 'Owner' ||
-          currentAuthState.selectedRole == 'HR' ||
-          currentAuthState.selectedRole == 'Supervisor';
+          currentAuthState.selectedRole == 'Accountant';
       if (currentRoute.startsWith('/sales')) {
         if (!hasSalesRolePermission) {
           return _getDashboardRoute(currentAuthState.selectedRole);
@@ -280,16 +303,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // 13. Billing
-      final hasBillingRolePermission = currentAuthState.selectedRole == 'Owner' ||
-          currentAuthState.selectedRole == 'HR' ||
-          currentAuthState.selectedRole == 'Supervisor';
+      // 13. Inward / Outward (Replaces legacy Billing)
       if (currentRoute.startsWith('/billing')) {
-        if (!hasBillingRolePermission) {
+        return '/inward-outward';
+      }
+
+      final hasInwardOutwardRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'HR' ||
+          currentAuthState.selectedRole == 'Supervisor' ||
+          currentAuthState.selectedRole == 'Accountant';
+      if (currentRoute.startsWith('/inward-outward')) {
+        if (!hasInwardOutwardRolePermission) {
           return _getDashboardRoute(currentAuthState.selectedRole);
         }
-        if (!isModuleEnabled('billing')) {
-          return '/feature-locked?module=Billing & Invoicing';
+        if (!isModuleEnabled('inward_outward')) {
+          return '/feature-locked?module=Inward / Outward';
         }
       }
 
@@ -416,14 +444,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // Enforce role-based access for purchase module
-      if (currentRoute.startsWith('/purchase')) {
+      if (currentRoute.startsWith('/purchase') || currentRoute.startsWith('/purchases')) {
         final role = currentAuthState.selectedRole;
-        if (role != 'Owner' && role != 'HR' && role != 'Supervisor') {
+        if (role != 'Owner' && role != 'Accountant') {
           return _getDashboardRoute(role);
         }
-        // Owner only for Add/Edit
+        // Owner & Accountant for Add/Edit
         if (currentRoute == '/purchase/add' || (currentRoute.startsWith('/purchase') && currentRoute.contains('/edit/'))) {
-          if (role != 'Owner') {
+          if (role != 'Owner' && role != 'Accountant') {
             return '/purchase';
           }
         }
@@ -433,22 +461,36 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (currentRoute.startsWith('/sales')) {
         final role = currentAuthState.selectedRole;
         
-        // Owner and HR only for Sales Analytics
+        // Owner only for Sales Analytics
         if (currentRoute.startsWith('/sales/analytics')) {
-          if (role != 'Owner' && role != 'HR') {
+          if (role != 'Owner') {
             return _getDashboardRoute(role);
           }
         } else {
-          // General sales list access for Owner, HR, Supervisor
-          if (role != 'Owner' && role != 'HR' && role != 'Supervisor') {
+          // General sales list access for Owner & Accountant only
+          if (role != 'Owner' && role != 'Accountant') {
             return _getDashboardRoute(role);
           }
         }
 
-        // Owner only for Add/Edit
+        // Owner & Accountant for Add/Edit
         if (currentRoute == '/sales/add' || (currentRoute.startsWith('/sales') && currentRoute.contains('/edit/'))) {
-          if (role != 'Owner') {
+          if (role != 'Owner' && role != 'Accountant') {
             return '/sales';
+          }
+        }
+      }
+
+      // Enforce role-based access for party master module
+      if (currentRoute.startsWith('/parties')) {
+        final role = currentAuthState.selectedRole;
+        if (role != 'Owner' && role != 'Accountant') {
+          return _getDashboardRoute(role);
+        }
+        // Owner only for Add/Edit
+        if (currentRoute == '/parties/add' || currentRoute.contains('/edit/')) {
+          if (role != 'Owner') {
+            return '/parties';
           }
         }
       }
@@ -954,17 +996,43 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/sales/view/:id',
+        name: 'sales_view',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return SaleDetailViewScreen(saleId: id);
+        },
+      ),
+      GoRoute(
         path: '/sales/:id',
         name: 'sales_detail_alias',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return SalesFormScreen(saleId: id);
+          return SaleDetailViewScreen(saleId: id);
         },
       ),
       GoRoute(
         path: '/sales/analytics',
         name: 'sales_analytics',
         builder: (context, state) => const SalesAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/parties',
+        name: 'party_list',
+        builder: (context, state) => const PartyListScreen(),
+      ),
+      GoRoute(
+        path: '/parties/add',
+        name: 'party_add',
+        builder: (context, state) => const PartyFormScreen(),
+      ),
+      GoRoute(
+        path: '/parties/edit/:id',
+        name: 'party_edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return PartyFormScreen(partyId: id);
+        },
       ),
       GoRoute(
         path: '/production',
@@ -1004,9 +1072,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ActivityScreen(),
       ),
       GoRoute(
-        path: '/billing',
-        name: 'billing_placeholder',
-        builder: (context, state) => const BillingPlaceholderScreen(),
+        path: '/inward-outward',
+        name: 'inward_outward_list',
+        builder: (context, state) => const InwardOutwardListScreen(),
+        routes: [
+          GoRoute(
+            path: 'add',
+            name: 'inward_outward_add',
+            builder: (context, state) => const InwardOutwardFormScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/comparison',
@@ -1103,6 +1178,8 @@ String _getDashboardRoute(String? role) {
     return '/owner-dashboard';
   } else if (role == 'HR' || role == 'Supervisor') {
     return '/hr-dashboard';
+  } else if (role == 'Accountant') {
+    return '/sales';
   } else {
     return '/employee-dashboard';
   }

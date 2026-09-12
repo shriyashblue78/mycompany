@@ -26,6 +26,7 @@ const List<String> kRoles = [
   'HR',
   'Supervisor',
   'Owner',
+  'Accountant',
 ];
 
 const List<String> kStatuses = [

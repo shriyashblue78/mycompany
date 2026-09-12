@@ -9,6 +9,7 @@ import '../../../../core/widgets/erp_drawer.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../core/widgets/responsive_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../domain/repositories/notification_repository.dart';
 import '../providers/notifications_provider.dart';
 
 class NotificationsDashboardScreen extends ConsumerWidget {
@@ -31,6 +32,14 @@ class NotificationsDashboardScreen extends ConsumerWidget {
         elevation: 0,
         backgroundColor: theme.colorScheme.surface,
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+        actions: [
+          if (isManager)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.red),
+              tooltip: 'Clear All Notifications',
+              onPressed: () => _confirmClearAll(context, ref, authState.user?.companyId ?? ''),
+            ),
+        ],
       ),
       drawer: const ERPDrawer(),
       body: statsAsync.when(
@@ -469,6 +478,44 @@ class NotificationsDashboardScreen extends ConsumerWidget {
         return AppColors.success;
     }
   }
+
+  Future<void> _confirmClearAll(BuildContext context, WidgetRef ref, String companyId) async {
+    if (companyId.isEmpty) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear All Notifications'),
+        content: const Text('Are you sure you want to delete all accumulated notification messages in your company?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Clear All', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await ref.read(notificationRepositoryProvider).deleteAllNotifications(companyId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All notifications cleared successfully.')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error clearing notifications: $e')),
+          );
+        }
+      }
+    }
+  }
 }
 
 class _StatItem {
@@ -479,3 +526,4 @@ class _StatItem {
 
   const _StatItem(this.title, this.value, this.icon, this.color);
 }
+

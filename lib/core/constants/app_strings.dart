@@ -14,6 +14,7 @@ class AppStrings {
   static const String roleOwner = 'Owner / Admin';
   static const String roleHR = 'HR / Supervisor';
   static const String roleEmployee = 'Employee';
+  static const String roleAccountant = 'Accountant';
 
   // Navigation Items
   static const String navDashboard = 'Dashboard';

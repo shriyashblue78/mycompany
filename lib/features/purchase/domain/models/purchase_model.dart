@@ -15,6 +15,13 @@ class PurchaseModel {
   final DateTime purchaseDate;
   final String remarks;
   final String status; // 'Pending', 'Received', 'Cancelled'
+  final String approvalStatus; // 'Approved', 'Pending Approval'
+  final String? createdByUid;
+  final String? createdByName;
+  final String? createdByRole;
+  final String? lastModifiedByUid;
+  final String? lastModifiedByName;
+  final String? lastModifiedByRole;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -33,6 +40,13 @@ class PurchaseModel {
     required this.purchaseDate,
     required this.remarks,
     required this.status,
+    this.approvalStatus = 'Approved',
+    this.createdByUid,
+    this.createdByName,
+    this.createdByRole,
+    this.lastModifiedByUid,
+    this.lastModifiedByName,
+    this.lastModifiedByRole,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -70,6 +84,13 @@ class PurchaseModel {
       purchaseDate: parseDate(map['purchaseDate']),
       remarks: (map['remarks'] ?? '') as String,
       status: (map['status'] ?? 'Pending') as String,
+      approvalStatus: (map['approvalStatus'] ?? 'Approved') as String,
+      createdByUid: map['createdByUid'] as String?,
+      createdByName: map['createdByName'] as String?,
+      createdByRole: map['createdByRole'] as String?,
+      lastModifiedByUid: map['lastModifiedByUid'] as String?,
+      lastModifiedByName: map['lastModifiedByName'] as String?,
+      lastModifiedByRole: map['lastModifiedByRole'] as String?,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -91,6 +112,13 @@ class PurchaseModel {
       'purchaseDate': Timestamp.fromDate(purchaseDate),
       'remarks': remarks,
       'status': status,
+      'approvalStatus': approvalStatus,
+      'createdByUid': createdByUid,
+      'createdByName': createdByName,
+      'createdByRole': createdByRole,
+      'lastModifiedByUid': lastModifiedByUid,
+      'lastModifiedByName': lastModifiedByName,
+      'lastModifiedByRole': lastModifiedByRole,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -123,6 +151,13 @@ class PurchaseModel {
     DateTime? purchaseDate,
     String? remarks,
     String? status,
+    String? approvalStatus,
+    String? createdByUid,
+    String? createdByName,
+    String? createdByRole,
+    String? lastModifiedByUid,
+    String? lastModifiedByName,
+    String? lastModifiedByRole,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -141,6 +176,13 @@ class PurchaseModel {
       purchaseDate: purchaseDate ?? this.purchaseDate,
       remarks: remarks ?? this.remarks,
       status: status ?? this.status,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      createdByUid: createdByUid ?? this.createdByUid,
+      createdByName: createdByName ?? this.createdByName,
+      createdByRole: createdByRole ?? this.createdByRole,
+      lastModifiedByUid: lastModifiedByUid ?? this.lastModifiedByUid,
+      lastModifiedByName: lastModifiedByName ?? this.lastModifiedByName,
+      lastModifiedByRole: lastModifiedByRole ?? this.lastModifiedByRole,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

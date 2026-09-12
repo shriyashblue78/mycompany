@@ -50,7 +50,7 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
     }
 
     try {
-      await FirebaseFunctions.instance.httpsCallable('createEmployee').call({
+      final res = await FirebaseFunctions.instance.httpsCallable('createEmployee').call({
         'companyId': companyId,
         'name': employee.name,
         'email': employee.email,
@@ -59,7 +59,19 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
         'department': employee.department,
         'designation': employee.designation,
         'temporaryPassword': password,
+        'photoUrl': employee.photoUrl,
       });
+
+      final createdEmpId = (res.data as Map?)?['employeeId'] as String? ?? employee.employeeId;
+
+      if (employee.photoUrl != null && employee.photoUrl!.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('companies')
+            .doc(companyId)
+            .collection('employees')
+            .doc(createdEmpId)
+            .set({'photoUrl': employee.photoUrl}, SetOptions(merge: true));
+      }
     } on FirebaseFunctionsException catch (e) {
       throw Exception(e.message ?? 'Failed to create employee.');
     } catch (e) {
@@ -87,7 +99,29 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
         'designation': employee.designation,
         'status': employee.status,
         'role': employee.role,
+        'photoUrl': employee.photoUrl,
       });
+
+      // Also ensure photoUrl is directly updated on the employee document
+      await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(companyId)
+          .collection('employees')
+          .doc(employee.employeeId)
+          .set({
+        'photoUrl': employee.photoUrl,
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+
+      if (employee.uid.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(employee.uid)
+            .set({
+          'photoUrl': employee.photoUrl,
+          'updatedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+      }
     } on FirebaseFunctionsException catch (e) {
       throw Exception(e.message ?? 'Failed to update employee details.');
     } catch (e) {

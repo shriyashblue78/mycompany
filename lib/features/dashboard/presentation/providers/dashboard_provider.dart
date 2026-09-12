@@ -241,7 +241,7 @@ List<ActivityItem> compileActivities({
       dateTime: p.createdAt,
       icon: Icons.shopping_cart_rounded,
       color: Colors.blue,
-      description: 'Purchase record created for supplier: ${p.supplierName}. Status: ${p.status}. Total Amount: \$${p.totalAmount.toStringAsFixed(2)}.',
+      description: 'Purchase record created for supplier: ${p.supplierName}. Status: ${p.status}. Total Amount: ₹${p.totalAmount.toStringAsFixed(2)}.',
       moduleType: 'Purchase',
     ));
   }
@@ -265,7 +265,7 @@ List<ActivityItem> compileActivities({
       dateTime: s.updatedAt,
       icon: Icons.sell_rounded,
       color: Colors.teal,
-      description: 'Sale record updated for customer: ${s.customerName}. Status: ${s.status}. Total Amount: \$${s.totalAmount.toStringAsFixed(2)}.',
+      description: 'Sale record updated for customer: ${s.customerName}. Status: ${s.status}. Total Amount: ₹${s.totalAmount.toStringAsFixed(2)}.',
       moduleType: 'Sales',
     ));
   }
