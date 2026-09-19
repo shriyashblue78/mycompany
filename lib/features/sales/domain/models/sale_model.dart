@@ -1,5 +1,65 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class SaleItem {
+  final String itemNumber;
+  final String itemName;
+  final String description;
+  final String hsnCode;
+  final String packing;
+  final String unit;
+  final double quantity;
+  final double rate;
+  final double amount;
+
+  const SaleItem({
+    this.itemNumber = '',
+    required this.itemName,
+    this.description = '',
+    this.hsnCode = '',
+    this.packing = '',
+    this.unit = 'Nos',
+    required this.quantity,
+    required this.rate,
+    required this.amount,
+  });
+
+  factory SaleItem.fromMap(Map<String, dynamic> map) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is int) return value.toDouble();
+      if (value is double) return value;
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    return SaleItem(
+      itemNumber: (map['itemNumber'] ?? '') as String,
+      itemName: (map['itemName'] ?? map['name'] ?? '') as String,
+      description: (map['description'] ?? '') as String,
+      hsnCode: (map['hsnCode'] ?? map['hsn'] ?? '') as String,
+      packing: (map['packing'] ?? '') as String,
+      unit: (map['unit'] ?? 'Nos') as String,
+      quantity: parseDouble(map['quantity']),
+      rate: parseDouble(map['rate'] ?? map['pricePerUnit']),
+      amount: parseDouble(map['amount'] ?? map['totalAmount']),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'itemNumber': itemNumber,
+      'itemName': itemName,
+      'description': description,
+      'hsnCode': hsnCode,
+      'packing': packing,
+      'unit': unit,
+      'quantity': quantity,
+      'rate': rate,
+      'amount': amount,
+    };
+  }
+}
+
 class SaleModel {
   final String saleId;
   final String companyId;
@@ -36,6 +96,21 @@ class SaleModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // Invoice & Transport Optional Details
+  final List<SaleItem>? items;
+  final String poNo;
+  final String poDate;
+  final String modeOfTransport;
+  final String transporter;
+  final String vehicleNo;
+  final String lrNo;
+  final String reverseCharge;
+  final String timeOfSupply;
+  final double? cgstAmount;
+  final double? sgstAmount;
+  final double? igstAmount;
+  final double? subtotal;
+
   const SaleModel({
     required this.saleId,
     required this.companyId,
@@ -71,7 +146,38 @@ class SaleModel {
     this.lastModifiedByRole,
     required this.createdAt,
     required this.updatedAt,
+    this.items,
+    this.poNo = '',
+    this.poDate = '',
+    this.modeOfTransport = 'Road',
+    this.transporter = '',
+    this.vehicleNo = '',
+    this.lrNo = '',
+    this.reverseCharge = 'NO',
+    this.timeOfSupply = '',
+    this.cgstAmount,
+    this.sgstAmount,
+    this.igstAmount,
+    this.subtotal,
   });
+
+  List<SaleItem> get effectiveItems {
+    if (items != null && items!.isNotEmpty) {
+      return items!;
+    }
+    return [
+      SaleItem(
+        itemNumber: itemNumber,
+        itemName: itemName,
+        description: itemName,
+        hsnCode: hsnCode,
+        unit: unit,
+        quantity: quantity,
+        rate: pricePerUnit,
+        amount: totalAmount,
+      )
+    ];
+  }
 
   factory SaleModel.fromMap(Map<String, dynamic> map, String id) {
     DateTime parseDate(dynamic value) {
@@ -89,6 +195,13 @@ class SaleModel {
       if (value is double) return value;
       if (value is String) return double.tryParse(value) ?? 0.0;
       return 0.0;
+    }
+
+    List<SaleItem>? parsedItems;
+    if (map['items'] != null && map['items'] is List) {
+      parsedItems = (map['items'] as List)
+          .map((i) => SaleItem.fromMap(Map<String, dynamic>.from(i as Map)))
+          .toList();
     }
 
     return SaleModel(
@@ -126,6 +239,19 @@ class SaleModel {
       lastModifiedByRole: map['lastModifiedByRole'] as String?,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
+      items: parsedItems,
+      poNo: (map['poNo'] ?? map['poNumber'] ?? '') as String,
+      poDate: (map['poDate'] ?? '') as String,
+      modeOfTransport: (map['modeOfTransport'] ?? map['transportMode'] ?? 'Road') as String,
+      transporter: (map['transporter'] ?? '') as String,
+      vehicleNo: (map['vehicleNo'] ?? map['vehicleNumber'] ?? '') as String,
+      lrNo: (map['lrNo'] ?? map['lrNumber'] ?? '') as String,
+      reverseCharge: (map['reverseCharge'] ?? 'NO') as String,
+      timeOfSupply: (map['timeOfSupply'] ?? '') as String,
+      cgstAmount: map['cgstAmount'] != null ? parseDouble(map['cgstAmount']) : null,
+      sgstAmount: map['sgstAmount'] != null ? parseDouble(map['sgstAmount']) : null,
+      igstAmount: map['igstAmount'] != null ? parseDouble(map['igstAmount']) : null,
+      subtotal: map['subtotal'] != null ? parseDouble(map['subtotal']) : null,
     );
   }
 
@@ -165,6 +291,19 @@ class SaleModel {
       'lastModifiedByRole': lastModifiedByRole,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      if (items != null) 'items': items!.map((i) => i.toMap()).toList(),
+      'poNo': poNo,
+      'poDate': poDate,
+      'modeOfTransport': modeOfTransport,
+      'transporter': transporter,
+      'vehicleNo': vehicleNo,
+      'lrNo': lrNo,
+      'reverseCharge': reverseCharge,
+      'timeOfSupply': timeOfSupply,
+      if (cgstAmount != null) 'cgstAmount': cgstAmount,
+      if (sgstAmount != null) 'sgstAmount': sgstAmount,
+      if (igstAmount != null) 'igstAmount': igstAmount,
+      if (subtotal != null) 'subtotal': subtotal,
     };
   }
 
@@ -215,6 +354,19 @@ class SaleModel {
     String? lastModifiedByRole,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<SaleItem>? items,
+    String? poNo,
+    String? poDate,
+    String? modeOfTransport,
+    String? transporter,
+    String? vehicleNo,
+    String? lrNo,
+    String? reverseCharge,
+    String? timeOfSupply,
+    double? cgstAmount,
+    double? sgstAmount,
+    double? igstAmount,
+    double? subtotal,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -251,6 +403,20 @@ class SaleModel {
       lastModifiedByRole: lastModifiedByRole ?? this.lastModifiedByRole,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      items: items ?? this.items,
+      poNo: poNo ?? this.poNo,
+      poDate: poDate ?? this.poDate,
+      modeOfTransport: modeOfTransport ?? this.modeOfTransport,
+      transporter: transporter ?? this.transporter,
+      vehicleNo: vehicleNo ?? this.vehicleNo,
+      lrNo: lrNo ?? this.lrNo,
+      reverseCharge: reverseCharge ?? this.reverseCharge,
+      timeOfSupply: timeOfSupply ?? this.timeOfSupply,
+      cgstAmount: cgstAmount ?? this.cgstAmount,
+      sgstAmount: sgstAmount ?? this.sgstAmount,
+      igstAmount: igstAmount ?? this.igstAmount,
+      subtotal: subtotal ?? this.subtotal,
     );
   }
 }
+

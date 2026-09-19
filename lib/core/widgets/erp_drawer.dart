@@ -8,6 +8,7 @@ import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
 import '../constants/app_strings.dart';
 import '../../features/auth/domain/models/user_model.dart';
+import '../../features/subscription/presentation/providers/subscription_provider.dart';
 
 class ERPDrawer extends ConsumerWidget {
   const ERPDrawer({super.key});
@@ -121,6 +122,57 @@ class ERPDrawer extends ConsumerWidget {
   ) {
     final List<Widget> children = [];
     final authState = ref.watch(authProvider);
+    final subAsync = ref.watch(currentCompanySubscriptionProvider);
+
+    // Show Expiry Warning Banner if expiring soon or expired
+    subAsync.whenData((sub) {
+      if (sub != null && (sub.isExpiringSoon || sub.isExpired)) {
+        children.add(
+          GestureDetector(
+            onTap: () => context.push('/subscription/plans'),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: sub.isExpired ? Colors.red.withOpacity(0.12) : Colors.amber.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: sub.isExpired ? Colors.red : Colors.amber.shade700, width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    sub.isExpired ? Icons.error_outline_rounded : Icons.timer_outlined,
+                    color: sub.isExpired ? Colors.red : Colors.amber.shade800,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sub.isExpired ? 'Subscription Expired' : 'Subscription Expiring Soon',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: sub.isExpired ? Colors.red : Colors.amber.shade900,
+                          ),
+                        ),
+                        Text(
+                          '${sub.remainingTimeFormatted} • Tap to Renew',
+                          style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    });
 
     bool isModuleEnabled(String module) {
       if (role == 'super_admin') return true;
@@ -263,6 +315,9 @@ class ERPDrawer extends ConsumerWidget {
 
     // ACCOUNT Section
     final accountItems = <_NavItem>[];
+    if (role == 'Owner' || role == 'HR' || role == 'super_admin') {
+      accountItems.add(const _NavItem('Subscription & Plans', Icons.stars_rounded, '/subscription/plans'));
+    }
     if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
       accountItems.add(const _NavItem(AppStrings.navSettings, Icons.settings_applications_rounded, '/settings'));
     } else {
@@ -441,6 +496,8 @@ class ERPDrawer extends ConsumerWidget {
               context.push('/settings');
             } else if (item.title == AppStrings.navReports || item.title == AppStrings.navAnalytics) {
               context.push('/reports');
+            } else if (item.title == 'Subscription & Plans' || item.route == '/subscription/plans') {
+              context.push('/subscription/plans');
             } else {
               _showTodoDialog(context, item.title, role);
             }

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -12,199 +10,19 @@ import '../../../../core/utils/file_saver.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/sale_model.dart';
 import '../providers/sales_provider.dart';
+import '../utils/sale_invoice_pdf_generator.dart';
 
 class SaleDetailViewScreen extends ConsumerWidget {
   final String saleId;
   const SaleDetailViewScreen({super.key, required this.saleId});
 
   static Future<void> generateAndDownloadPdf(BuildContext context, SaleModel sale, String companyName) async {
-    final pdf = pw.Document();
-    final saleDateStr = DateFormat('dd/MM/yyyy').format(sale.saleDate);
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context pdfContext) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        companyName.toUpperCase(),
-                        style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text('TAX INVOICE / SALE DOCUMENT', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('Invoice No: ${sale.invoiceNumber ?? sale.saleNumber}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Sale Ref: ${sale.saleNumber}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                      pw.Text('Date: $saleDateStr', style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('Status: ${sale.status}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 16),
-              pw.Divider(thickness: 1),
-              pw.SizedBox(height: 12),
-
-              // Billed To / Party Section
-              pw.Container(
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('PARTY / CUSTOMER DETAILS', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                    pw.SizedBox(height: 6),
-                    pw.Row(
-                      children: [
-                        pw.Expanded(child: pw.Text('Party Name: ${sale.customerName}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                        pw.Expanded(child: pw.Text('Phone: ${sale.customerPhone}')),
-                      ],
-                    ),
-                    if (sale.partyType.isNotEmpty || sale.vendorCode.isNotEmpty) ...[
-                      pw.SizedBox(height: 4),
-                      pw.Row(
-                        children: [
-                          if (sale.partyType.isNotEmpty) pw.Expanded(child: pw.Text('Party Type: ${sale.partyType}')),
-                          if (sale.vendorCode.isNotEmpty) pw.Expanded(child: pw.Text('Vendor Code: ${sale.vendorCode}')),
-                        ],
-                      ),
-                    ],
-                    if (sale.gstin.isNotEmpty || sale.state.isNotEmpty) ...[
-                      pw.SizedBox(height: 4),
-                      pw.Row(
-                        children: [
-                          if (sale.gstin.isNotEmpty) pw.Expanded(child: pw.Text('GSTIN: ${sale.gstin}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                          if (sale.state.isNotEmpty) pw.Expanded(child: pw.Text('State: ${sale.state} (${sale.stateCode})')),
-                        ],
-                      ),
-                    ],
-                    if (sale.contactPersonName.isNotEmpty || sale.email.isNotEmpty) ...[
-                      pw.SizedBox(height: 4),
-                      pw.Row(
-                        children: [
-                          if (sale.contactPersonName.isNotEmpty) pw.Expanded(child: pw.Text('Contact Person: ${sale.contactPersonName}')),
-                          if (sale.email.isNotEmpty) pw.Expanded(child: pw.Text('Email: ${sale.email}')),
-                        ],
-                      ),
-                    ],
-                    if (sale.address.isNotEmpty) ...[
-                      pw.SizedBox(height: 4),
-                      pw.Text('Address: ${sale.address}'),
-                    ],
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 16),
-
-              // Item Details Table
-              pw.Text('LINE ITEM DETAILS', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 6),
-              pw.TableHelper.fromTextArray(
-                context: pdfContext,
-                headers: <String>['S.No', 'Item Number', 'Item Name', 'HSN Code', 'Qty / Unit', 'Rate (INR)', 'Total (INR)'],
-                data: <List<String>>[
-                  <String>[
-                    '1',
-                    sale.itemNumber.isNotEmpty ? sale.itemNumber : '-',
-                    sale.itemName,
-                    sale.hsnCode.isNotEmpty ? sale.hsnCode : '-',
-                    '${sale.quantity} ${sale.unit}',
-                    '₹${sale.pricePerUnit.toStringAsFixed(2)}',
-                    '₹${sale.totalAmount.toStringAsFixed(2)}',
-                  ]
-                ],
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
-                cellStyle: const pw.TextStyle(fontSize: 10),
-                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                columnWidths: {
-                  0: const pw.FixedColumnWidth(35),
-                  1: const pw.FixedColumnWidth(70),
-                  2: const pw.FlexColumnWidth(2),
-                  3: const pw.FixedColumnWidth(60),
-                  4: const pw.FixedColumnWidth(65),
-                  5: const pw.FixedColumnWidth(70),
-                  6: const pw.FixedColumnWidth(75),
-                },
-              ),
-              pw.SizedBox(height: 16),
-
-              // Total Calculation Summary
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.Container(
-                    width: 200,
-                    padding: const pw.EdgeInsets.all(8),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                    ),
-                    child: pw.Column(
-                      children: [
-                        pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 10)),
-                            pw.Text('₹${sale.totalAmount.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
-                          ],
-                        ),
-                        pw.Divider(thickness: 0.5),
-                        pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Text('Grand Total:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                            pw.Text('₹${sale.totalAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              if (sale.remarks.isNotEmpty) ...[
-                pw.SizedBox(height: 16),
-                pw.Text('Remarks / Terms:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 4),
-                pw.Text(sale.remarks, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800)),
-              ],
-
-              pw.Spacer(),
-              pw.Divider(thickness: 0.5),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Authorized Signatory', style: const pw.TextStyle(fontSize: 10)),
-                  pw.Text('Computer Generated Invoice', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                ],
-              ),
-            ],
-          );
-        },
-      ),
+    final bytes = await SaleInvoicePdfGenerator.generatePdf(
+      sale: sale,
+      companyName: companyName,
     );
-
-    final bytes = await pdf.save();
     final fileName = 'Invoice_${sale.invoiceNumber ?? sale.saleNumber}.pdf';
-    saveFile(bytes, fileName, 'application/pdf');
+    await saveFile(bytes, fileName, 'application/pdf');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('A4 Invoice PDF ($fileName) downloaded successfully.')),

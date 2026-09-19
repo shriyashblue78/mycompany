@@ -88,6 +88,9 @@ import '../../features/project_tracker/domain/models/project_model.dart';
 import '../../features/project_tracker/presentation/screens/project_dashboard_screen.dart';
 import '../../features/project_tracker/presentation/screens/project_form_screen.dart';
 import '../../features/project_tracker/presentation/screens/project_detail_screen.dart';
+import '../../features/super_admin/presentation/screens/super_admin_subscription_screen.dart';
+import '../../features/subscription/presentation/screens/customer_subscription_plans_screen.dart';
+import '../../features/subscription/presentation/screens/customer_checkout_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -1165,6 +1168,41 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['companyId']!;
           return SuperAdminOwnerDetailScreen(companyId: id);
+        },
+      ),
+      GoRoute(
+        path: '/super-admin/company/:companyId/subscription',
+        name: 'super_admin_company_subscription',
+        builder: (context, state) {
+          final id = state.pathParameters['companyId']!;
+          return SuperAdminSubscriptionScreen(companyId: id);
+        },
+      ),
+      GoRoute(
+        path: '/subscription/plans',
+        name: 'customer_subscription_plans',
+        builder: (context, state) => const CustomerSubscriptionPlansScreen(),
+      ),
+      GoRoute(
+        path: '/subscription/checkout',
+        name: 'customer_checkout',
+        builder: (context, state) {
+          final planId = state.uri.queryParameters['planId'] ?? 'basic';
+          final durationLabel = state.uri.queryParameters['duration'] ?? '1 Month';
+          final amountStr = state.uri.queryParameters['amount'] ?? '0';
+          final amount = double.tryParse(amountStr) ?? 0.0;
+          return CustomerCheckoutScreen(
+            planId: planId,
+            durationLabel: durationLabel,
+            amount: amount,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/dashboard',
+        redirect: (context, state) {
+          final authState = ref.read(authProvider);
+          return _getDashboardRoute(authState.selectedRole);
         },
       ),
     ],

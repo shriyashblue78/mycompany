@@ -31,6 +31,11 @@ class SuperAdminCompanyDetailScreen extends ConsumerWidget {
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         actions: [
           IconButton(
+            icon: const Icon(Icons.stars_rounded, color: Colors.amber),
+            tooltip: 'Subscription & Feature Controls',
+            onPressed: () => context.push('/super-admin/company/$companyId/subscription'),
+          ),
+          IconButton(
             icon: const Icon(Icons.edit_rounded, color: Colors.blue),
             tooltip: 'Edit Company Profile',
             onPressed: () => context.push('/super-admin/company/$companyId/edit'),
