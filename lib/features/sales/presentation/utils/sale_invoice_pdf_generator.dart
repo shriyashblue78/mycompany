@@ -7,11 +7,43 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../domain/models/sale_model.dart';
 
+enum InvoiceCopyType {
+  original,
+  duplicate,
+  triplicate,
+}
+
+extension InvoiceCopyTypeExtension on InvoiceCopyType {
+  String get displayName {
+    switch (this) {
+      case InvoiceCopyType.original:
+        return 'ORIGINAL';
+      case InvoiceCopyType.duplicate:
+        return 'DUPLICATE';
+      case InvoiceCopyType.triplicate:
+        return 'TRIPLICATE';
+    }
+  }
+
+  String get pdfHeaderLabel {
+    switch (this) {
+      case InvoiceCopyType.original:
+        return 'ORIGINAL FOR RECIPIENT';
+      case InvoiceCopyType.duplicate:
+        return 'DUPLICATE FOR TRANSPORTER';
+      case InvoiceCopyType.triplicate:
+        return 'TRIPLICATE FOR SUPPLIER';
+    }
+  }
+}
+
 class SaleInvoicePdfGenerator {
   static Future<Uint8List> generatePdf({
     required SaleModel sale,
     required String companyName,
+    List<InvoiceCopyType> copyTypes = const [InvoiceCopyType.original],
   }) async {
+    final effectiveCopyTypes = copyTypes.isEmpty ? [InvoiceCopyType.original] : copyTypes;
     // 1. Fetch Company Data from Firestore if available
     Map<String, dynamic>? companyData;
     try {
@@ -134,49 +166,50 @@ class SaleInvoicePdfGenerator {
 
     final pdf = pw.Document();
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(20),
-        build: (pw.Context pdfContext) {
-          return pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.black, width: 1.0),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: [
-                // 1. TOP HEADER BAR
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: const pw.BoxDecoration(
-                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 0.75)),
-                  ),
-                  child: pw.Stack(
-                    children: [
-                      pw.Align(
-                        alignment: pw.Alignment.center,
-                        child: pw.Text(
-                          'TAX INVOICE',
-                          style: pw.TextStyle(
-                            fontSize: 12,
-                            fontWeight: pw.FontWeight.bold,
+    for (final copyType in effectiveCopyTypes) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(20),
+          build: (pw.Context pdfContext) {
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1.0),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  // 1. TOP HEADER BAR
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: const pw.BoxDecoration(
+                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 0.75)),
+                    ),
+                    child: pw.Stack(
+                      children: [
+                        pw.Align(
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            'TAX INVOICE',
+                            style: pw.TextStyle(
+                              fontSize: 12,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      pw.Align(
-                        alignment: pw.Alignment.centerRight,
-                        child: pw.Text(
-                          'TRIPLICATE FOR SUPPLIER',
-                          style: pw.TextStyle(
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
+                        pw.Align(
+                          alignment: pw.Alignment.centerRight,
+                          child: pw.Text(
+                            copyType.pdfHeaderLabel,
+                            style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
                 // 2. COMPANY LOGO & NAME HEADER SECTION
                 pw.Container(
@@ -271,7 +304,7 @@ class SaleInvoicePdfGenerator {
                               _buildKvRow('INVOICE NO.', invNo, isBoldValue: true),
                               _buildKvRow('INVOICE DATE', invDateStr),
                               _buildKvRow('TIME OF SUPPLY', timeOfSupplyStr),
-                              _buildKvRow('WHETHER TAX ON REVERSE CHARGE', sale.reverseCharge),
+                              _buildKvRow('WHETHER TAX ON REVERSE CHARGE', sale.reverseCharge.isNotEmpty ? sale.reverseCharge : 'NO'),
                             ],
                           ),
                         ),
@@ -383,10 +416,12 @@ class SaleInvoicePdfGenerator {
                   ),
                 ),
 
-                // 6. MAIN LINE ITEMS TABLE
+                // 6. MAIN LINE ITEMS TABLE — fills all remaining vertical space
                 pw.Expanded(
-                  child: pw.Container(
-                    child: _buildItemTable(items),
+                  child: pw.LayoutBuilder(
+                    builder: (pw.Context ctx, pw.BoxConstraints? constraints) {
+                      return _buildItemTable(items, availableHeight: constraints?.maxHeight);
+                    },
                   ),
                 ),
 
@@ -595,27 +630,25 @@ class SaleInvoicePdfGenerator {
         },
       ),
     );
+  }
 
-    return pdf.save();
+  return pdf.save();
   }
 
   // --- HELPER BUILDERS & FORMATTERS ---
 
   static pw.Widget _buildKvRow(String label, String value, {bool isBoldValue = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 2),
+      padding: const pw.EdgeInsets.only(bottom: 1.5),
       child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.SizedBox(
-            width: 100,
+            width: 90,
             child: pw.Text(
               label,
               style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
             ),
-          ),
-          pw.Text(
-            ': ',
-            style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
           ),
           pw.Expanded(
             child: pw.Text(
@@ -641,10 +674,6 @@ class SaleInvoicePdfGenerator {
             label,
             style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
           ),
-        ),
-        pw.Text(
-          ': ',
-          style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
         ),
         pw.Expanded(
           child: pw.Text(
@@ -674,10 +703,6 @@ class SaleInvoicePdfGenerator {
             'BANK DETAILS',
             style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
           ),
-        ),
-        pw.Text(
-          ': ',
-          style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
         ),
         pw.Expanded(
           child: pw.Column(
@@ -720,7 +745,23 @@ class SaleInvoicePdfGenerator {
     );
   }
 
-  static pw.Widget _buildItemTable(List<SaleItem> items) {
+  static pw.Widget _buildItemTable(List<SaleItem> items, {double? availableHeight}) {
+    // Header row height ~18pt, each data/empty row ~18pt minimum
+    const double headerHeight = 18.0;
+    const double rowHeight = 18.0;
+
+    // Calculate number of empty rows needed to fill available space
+    int minEmptyRows = 12;
+    if (availableHeight != null && availableHeight > 0) {
+      final double usedByItems = headerHeight + items.length * rowHeight;
+      final double remaining = availableHeight - usedByItems;
+      final int dynamicRows = (remaining / rowHeight).ceil();
+      minEmptyRows = dynamicRows > 0 ? dynamicRows : 0;
+    } else {
+      // Fallback: ensure at least (12 - items.length) empty rows
+      minEmptyRows = (12 - items.length).clamp(0, 30);
+    }
+
     // Build Rows
     final List<pw.TableRow> tableRows = [];
 
@@ -729,14 +770,14 @@ class SaleInvoicePdfGenerator {
       pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.white),
         children: [
-          _cellHeader('S.N.', width: 25, alignment: pw.TextAlign.center),
+          _cellHeader('S.N.', alignment: pw.TextAlign.center),
           _cellHeader('Description', isFlex: true, alignment: pw.TextAlign.center),
-          _cellHeader('HSN / SAC', width: 60, alignment: pw.TextAlign.center),
-          _cellHeader('Packing', width: 45, alignment: pw.TextAlign.center),
-          _cellHeader('Unit', width: 35, alignment: pw.TextAlign.center),
-          _cellHeader('Qty.', width: 40, alignment: pw.TextAlign.center),
-          _cellHeader('Rate', width: 55, alignment: pw.TextAlign.center),
-          _cellHeader('Amount', width: 65, alignment: pw.TextAlign.center),
+          _cellHeader('HSN / SAC', alignment: pw.TextAlign.center),
+          _cellHeader('Packing', alignment: pw.TextAlign.center),
+          _cellHeader('Unit', alignment: pw.TextAlign.center),
+          _cellHeader('Qty.', alignment: pw.TextAlign.center),
+          _cellHeader('Rate', alignment: pw.TextAlign.center),
+          _cellHeader('Amount', alignment: pw.TextAlign.center),
         ],
       ),
     );
@@ -747,78 +788,113 @@ class SaleInvoicePdfGenerator {
       tableRows.add(
         pw.TableRow(
           children: [
-            _cellText('${i + 1}', width: 25, alignment: pw.TextAlign.center),
-            _cellDescription(item.itemName, item.description, item.itemNumber),
-            _cellText(item.hsnCode.isNotEmpty ? item.hsnCode : '-', width: 60, alignment: pw.TextAlign.center),
-            _cellText(item.packing.isNotEmpty ? item.packing : '', width: 45, alignment: pw.TextAlign.center),
-            _cellText(item.unit.isNotEmpty ? item.unit : 'Nos', width: 35, alignment: pw.TextAlign.center),
-            _cellText(item.quantity.toStringAsFixed(2), width: 40, alignment: pw.TextAlign.right),
-            _cellText(_formatAmount(item.rate), width: 55, alignment: pw.TextAlign.right),
-            _cellText(_formatAmount(item.amount), width: 65, alignment: pw.TextAlign.right),
+            _cellText('${i + 1}', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellDescription(item.itemName, item.description, item.itemNumber, minHeight: rowHeight),
+            _cellText(item.hsnCode.isNotEmpty ? item.hsnCode : '', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText(item.packing.isNotEmpty ? item.packing : '', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText(item.unit.isNotEmpty ? item.unit : 'Nos', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText(item.quantity.toStringAsFixed(2), alignment: pw.TextAlign.right, minHeight: rowHeight),
+            _cellText(_formatAmount(item.rate), alignment: pw.TextAlign.right, minHeight: rowHeight),
+            _cellText(_formatAmount(item.amount), alignment: pw.TextAlign.right, minHeight: rowHeight),
+          ],
+        ),
+      );
+    }
+
+    // Empty rows to fill remaining height
+    for (int k = 0; k < minEmptyRows; k++) {
+      tableRows.add(
+        pw.TableRow(
+          children: [
+            _cellText('', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText('', minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.center, minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.right, minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.right, minHeight: rowHeight),
+            _cellText('', alignment: pw.TextAlign.right, minHeight: rowHeight),
           ],
         ),
       );
     }
 
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.black, width: 0.75),
+      border: pw.TableBorder(
+        // Outer border on all 4 sides
+        top: const pw.BorderSide(color: PdfColors.black, width: 0.75),
+        bottom: const pw.BorderSide(color: PdfColors.black, width: 0.75),
+        left: const pw.BorderSide(color: PdfColors.black, width: 0.75),
+        right: const pw.BorderSide(color: PdfColors.black, width: 0.75),
+        // Vertical lines between columns only — NO horizontal row separators
+        verticalInside: const pw.BorderSide(color: PdfColors.black, width: 0.75),
+        // Header row gets a bottom line to separate it from data rows
+        horizontalInside: pw.BorderSide.none,
+      ),
       columnWidths: {
-        0: const pw.FixedColumnWidth(25),
+        0: const pw.FixedColumnWidth(22),
         1: const pw.FlexColumnWidth(1),
-        2: const pw.FixedColumnWidth(60),
-        3: const pw.FixedColumnWidth(45),
-        4: const pw.FixedColumnWidth(35),
-        5: const pw.FixedColumnWidth(40),
-        6: const pw.FixedColumnWidth(55),
-        7: const pw.FixedColumnWidth(65),
+        2: const pw.FixedColumnWidth(58),
+        3: const pw.FixedColumnWidth(42),
+        4: const pw.FixedColumnWidth(32),
+        5: const pw.FixedColumnWidth(38),
+        6: const pw.FixedColumnWidth(52),
+        7: const pw.FixedColumnWidth(62),
       },
       children: tableRows,
     );
   }
 
-  static pw.Widget _cellHeader(String text, {double? width, bool isFlex = false, pw.TextAlign alignment = pw.TextAlign.left}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+  static pw.Widget _cellHeader(String text, {bool isFlex = false, pw.TextAlign alignment = pw.TextAlign.left}) {
+    return pw.Container(
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColors.black, width: 0.75),
+        ),
+      ),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 4),
       child: pw.Text(
         text,
-        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+        style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
         textAlign: alignment,
       ),
     );
   }
 
-  static pw.Widget _cellText(String text, {double? width, pw.TextAlign alignment = pw.TextAlign.left}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+  static pw.Widget _cellText(String text, {pw.TextAlign alignment = pw.TextAlign.left, double? minHeight}) {
+    return pw.Container(
+      constraints: minHeight != null ? pw.BoxConstraints(minHeight: minHeight) : null,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       child: pw.Text(
         text,
-        style: const pw.TextStyle(fontSize: 8),
+        style: const pw.TextStyle(fontSize: 7.5),
         textAlign: alignment,
       ),
     );
   }
 
-  static pw.Widget _cellDescription(String title, String description, String itemNum) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+  static pw.Widget _cellDescription(String title, String description, String itemNum, {double? minHeight}) {
+    return pw.Container(
+      constraints: minHeight != null ? pw.BoxConstraints(minHeight: minHeight) : null,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
             title.toUpperCase(),
-            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
           ),
           if (description.isNotEmpty && description.toUpperCase() != title.toUpperCase()) ...[
             pw.SizedBox(height: 1),
             pw.Text(
               description.toUpperCase(),
-              style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+              style: const pw.TextStyle(fontSize: 7),
             ),
           ] else if (itemNum.isNotEmpty && itemNum.toUpperCase() != title.toUpperCase()) ...[
             pw.SizedBox(height: 1),
             pw.Text(
               itemNum.toUpperCase(),
-              style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+              style: const pw.TextStyle(fontSize: 7),
             ),
           ],
         ],

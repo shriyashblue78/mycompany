@@ -5,7 +5,7 @@ abstract class EmployeeRepository {
   Future<List<EmployeeModel>> getEmployees(String companyId);
 
   /// Real-time stream of employees for a company
-  Stream<List<EmployeeModel>> streamEmployees(String companyId, {int? limit});
+  Stream<List<EmployeeModel>> streamEmployees(String companyId, {int? limit, bool includeDeleted = false});
 
   /// Create an employee account (Owner / HR operation)
   Future<void> createEmployee({
@@ -39,4 +39,21 @@ abstract class EmployeeRepository {
 
   /// Check if an email is already registered in the system
   Future<bool> isEmailExists(String email);
+
+  /// Soft delete an employee (Owner operation - preserves history & releases seat)
+  Future<void> softDeleteEmployee({
+    required String companyId,
+    required String employeeId,
+    required String deletedByUid,
+    required String deletedByName,
+    String? reason,
+  });
+
+  /// Restore an archived employee to active workforce (Owner operation)
+  Future<void> restoreEmployee({
+    required String companyId,
+    required String employeeId,
+  });
+  /// Stream archived (soft-deleted) employees for Owner History View
+  Stream<List<EmployeeModel>> streamArchivedEmployees(String companyId);
 }

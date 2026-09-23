@@ -227,19 +227,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: AppSizes.p16),
 
-                  // Password Input
+                  // Password / PIN Input
                   CustomTextField(
-                    labelText: 'Password',
-                    hintText: '••••••••',
+                    labelText: 'Password / PIN',
+                    hintText: 'Enter password or PIN',
                     prefixIcon: Icons.lock_outline,
                     isPassword: true,
                     controller: _passwordController,
                     validator: (val) {
                       if (val == null || val.isEmpty) {
-                        return 'Password is required';
+                        return 'Password / PIN is required';
                       }
-                      if (val.length < 6) {
-                        return 'Password must be at least 6 characters';
+                      if (val.length < 4) {
+                        return 'Password or PIN must be at least 4 characters';
                       }
                       return null;
                     },

@@ -429,8 +429,104 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
     );
   }
 
+  Future<void> _softDelete(EmployeeModel employee) async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final companyId = user?.companyId;
+    if (companyId == null) return;
+
+    final reasonController = TextEditingController();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Remove Employee?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to remove ${employee.name} (${employee.employeeId}) from the active workforce?'),
+            const SizedBox(height: 12),
+            const Text(
+              '• Employee will be archived and disabled from app login.\n• 1 Employee Seat will be released immediately.\n• Historical tasks, attendance, and records are preserved.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Removal Reason (Optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove Employee'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isActionLoading = true);
+    try {
+      await ref.read(employeeRepositoryProvider).softDeleteEmployee(
+            companyId: companyId,
+            employeeId: employee.employeeId,
+            deletedByUid: user?.uid ?? '',
+            deletedByName: user?.name ?? 'Owner',
+            reason: reasonController.text.trim().isNotEmpty ? reasonController.text.trim() : null,
+          );
+
+      ref.invalidate(filteredEmployeesProvider);
+      ref.invalidate(activeEmployeesCountProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${employee.name} removed from active workforce. 1 seat released!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove employee: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
   Widget _buildActionsSection(BuildContext context, EmployeeModel employee) {
-    final isActive = employee.status == 'Active';
+    final authState = ref.watch(authProvider);
+    final isOwner = authState.selectedRole == 'Owner' || authState.selectedRole == 'super_admin';
+    final isActive = employee.status == 'Active' && !employee.isDeleted;
 
     return Column(
       children: [
@@ -456,6 +552,21 @@ class _EmployeeDetailScreenState extends ConsumerState<EmployeeDetailScreen> {
           isLoading: _isActionLoading,
           onPressed: () => _toggleStatus(employee),
         ),
+        if (isOwner && !employee.isDeleted) ...[
+          const SizedBox(height: AppSizes.p12),
+          OutlinedButton.icon(
+            onPressed: _isActionLoading ? null : () => _softDelete(employee),
+            icon: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+            label: const Text(
+              'Remove / Soft Delete Employee',
+              style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.error),
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+        ],
       ],
     );
   }

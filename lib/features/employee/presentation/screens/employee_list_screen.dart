@@ -46,6 +46,12 @@ class EmployeeListScreen extends ConsumerWidget {
         backgroundColor: theme.colorScheme.surface,
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         actions: [
+          if (role == 'Owner' || role == 'super_admin')
+            IconButton(
+              icon: const Icon(Icons.archive_outlined),
+              tooltip: 'Archived Workforce History',
+              onPressed: () => context.push('/employees/archived'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: () {

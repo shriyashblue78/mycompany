@@ -164,7 +164,7 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.print_rounded, size: 18, color: Colors.purple),
                                     tooltip: 'Print A4 PDF',
-                                    onPressed: () => SaleDetailViewScreen.generateAndDownloadPdf(context, s, authState.selectedCompany ?? 'Apex Industries'),
+                                    onPressed: () => SaleDetailViewScreen.showCopySelectorAndGeneratePdf(context, s, authState.selectedCompany ?? 'Apex Industries'),
                                   ),
                                   if (isOwner && isPendingApproval)
                                     IconButton(
@@ -408,7 +408,7 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
                         IconButton(
                           icon: const Icon(Icons.print_rounded, color: Colors.purple),
                           tooltip: 'Print A4 PDF',
-                          onPressed: () => SaleDetailViewScreen.generateAndDownloadPdf(context, sale, companyName),
+                          onPressed: () => SaleDetailViewScreen.showCopySelectorAndGeneratePdf(context, sale, companyName),
                         ),
                         if (isOwner && isPendingApproval)
                           ElevatedButton.icon(

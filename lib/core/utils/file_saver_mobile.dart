@@ -4,31 +4,41 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<void> saveFile(List<int> bytes, String fileName, String mimeType) async {
   try {
-    Directory? dir;
+    File? savedFile;
     if (Platform.isAndroid) {
-      final downloadDir = Directory('/storage/emulated/0/Download');
-      if (await downloadDir.exists()) {
-        dir = downloadDir;
-      } else {
-        dir = await getExternalStorageDirectory();
+      try {
+        final downloadDir = Directory('/storage/emulated/0/Download');
+        if (await downloadDir.exists()) {
+          final testFile = File('${downloadDir.path}/$fileName');
+          await testFile.writeAsBytes(bytes, flush: true);
+          savedFile = testFile;
+        }
+      } catch (_) {
+        // Fall back if permission denied for public download folder
       }
-    } else if (Platform.isIOS) {
-      dir = await getApplicationDocumentsDirectory();
     }
-    dir ??= await getApplicationDocumentsDirectory();
 
-    final filePath = '${dir.path}/$fileName';
-    final file = File(filePath);
-    await file.writeAsBytes(bytes, flush: true);
+    if (savedFile == null) {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final localFile = File('${docsDir.path}/$fileName');
+      await localFile.writeAsBytes(bytes, flush: true);
+      savedFile = localFile;
+    }
 
-    // Redirect & Open the PDF/file on mobile device
-    final uri = Uri.file(filePath);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      await launchUrl(uri);
+    final uri = Uri.file(savedFile.path);
+    bool launched = false;
+    try {
+      if (await canLaunchUrl(uri)) {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+
+    if (!launched) {
+      try {
+        await launchUrl(uri);
+      } catch (_) {}
     }
   } catch (e) {
-    print('Error saving/opening file on mobile: $e');
+    rethrow;
   }
 }

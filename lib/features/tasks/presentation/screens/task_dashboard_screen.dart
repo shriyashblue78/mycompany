@@ -212,6 +212,13 @@ class TaskDashboardScreen extends ConsumerWidget {
           Colors.indigo,
           () => context.push('/tasks/list'),
         ),
+        _ActionItem(
+          'Task Work Report',
+          'Track actual employee task hours & export PDF',
+          Icons.timelapse_rounded,
+          Colors.amber.shade800,
+          () => context.push('/reports/task-working-hours'),
+        ),
       ] else ...[
         _ActionItem(
           'My Active Tasks',

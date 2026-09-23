@@ -58,6 +58,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
   bool _isLoading = false;
   bool _isEditMode = false;
+  bool _showPassword = false;
+  bool _showConfirmPassword = false;
   String? _formErrorMessage;
 
   // Predefined high-quality user avatars
@@ -285,10 +287,16 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
         if (companyDoc.exists) {
           final maxEmployees = companyDoc.data()?['maxEmployees'] as int? ?? 50;
           final employeesSnap = await FirebaseFirestore.instance.collection('companies').doc(companyId).collection('employees').get();
-          if (employeesSnap.docs.length >= maxEmployees) {
+          final activeCount = employeesSnap.docs.where((doc) {
+            final data = doc.data();
+            final isDeleted = (data['isDeleted'] ?? false) == true;
+            final status = (data['status'] ?? 'Active') as String;
+            return !isDeleted && status == 'Active';
+          }).length;
+          if (activeCount >= maxEmployees) {
             setState(() {
               _isLoading = false;
-              _formErrorMessage = 'Employee limit reached. Please contact the Main Admin to increase your seat limit.';
+              _formErrorMessage = 'Employee seat limit reached ($activeCount/$maxEmployees). Please contact the Main Admin to increase your seat limit.';
             });
             return;
           }
@@ -823,30 +831,46 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                       ),
                       const SizedBox(height: AppSizes.p16),
 
-                      // Password fields (only on Add)
+                      // Employee Password / PIN fields (only on Add)
                       if (!_isEditMode) ...[
                         ResponsiveFormRow(
                           children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildLabel('Password *'),
+                                _buildLabel('Employee Password / PIN *'),
                                 TextFormField(
                                   controller: _passwordController,
-                                  obscureText: true,
-                                  decoration: const InputDecoration(
-                                    hintText: '••••••••',
-                                    prefixIcon: Icon(Icons.lock_outline_rounded),
+                                  obscureText: !_showPassword,
+                                  keyboardType: TextInputType.visiblePassword,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 1234 or 123456',
+                                    prefixIcon: const Icon(Icons.pin_outlined),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showPassword ? Icons.visibility_off : Icons.visibility,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _showPassword = !_showPassword;
+                                        });
+                                      },
+                                    ),
                                   ),
                                   validator: (val) {
-                                    if (val == null || val.isEmpty) return 'Password is required';
-                                    
-                                    // Password strength validation:
-                                    // min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
-                                    final passwordRegex = RegExp(
-                                        r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
-                                    if (!passwordRegex.hasMatch(val)) {
-                                      return 'Must be 8+ chars with uppercase, lowercase, number, and special char';
+                                    if (val == null || val.trim().isEmpty) {
+                                      return 'Password / PIN is required';
+                                    }
+                                    final pin = val.trim();
+                                    final isNumericPin = RegExp(r'^\d+$').hasMatch(pin);
+                                    if (isNumericPin) {
+                                      if (pin.length < 4 || pin.length > 8) {
+                                        return 'Numeric PIN must be 4 to 8 digits (e.g. 1234, 123456, or 12345678)';
+                                      }
+                                    } else {
+                                      if (pin.length < 6) {
+                                        return 'Password must be at least 6 characters long';
+                                      }
                                     }
                                     return null;
                                   },
@@ -856,17 +880,28 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildLabel('Confirm Password *'),
+                                _buildLabel('Confirm Password / PIN *'),
                                 TextFormField(
                                   controller: _confirmPasswordController,
-                                  obscureText: true,
-                                  decoration: const InputDecoration(
-                                    hintText: '••••••••',
-                                    prefixIcon: Icon(Icons.lock_outline_rounded),
+                                  obscureText: !_showConfirmPassword,
+                                  keyboardType: TextInputType.visiblePassword,
+                                  decoration: InputDecoration(
+                                    hintText: 'Re-enter PIN or password',
+                                    prefixIcon: const Icon(Icons.pin_outlined),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _showConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _showConfirmPassword = !_showConfirmPassword;
+                                        });
+                                      },
+                                    ),
                                   ),
                                   validator: (val) {
-                                    if (val == null || val.isEmpty) return 'Please confirm your password';
-                                    if (val != _passwordController.text) return 'Passwords do not match';
+                                    if (val == null || val.trim().isEmpty) return 'Please confirm Password / PIN';
+                                    if (val.trim() != _passwordController.text.trim()) return 'Password / PIN does not match';
                                     return null;
                                   },
                                 ),

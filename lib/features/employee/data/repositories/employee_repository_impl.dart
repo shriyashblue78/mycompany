@@ -23,7 +23,7 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   }
 
   @override
-  Stream<List<EmployeeModel>> streamEmployees(String companyId, {int? limit}) {
+  Stream<List<EmployeeModel>> streamEmployees(String companyId, {int? limit, bool includeDeleted = false}) {
     var query = FirebaseFirestore.instance
         .collection('companies')
         .doc(companyId)
@@ -33,10 +33,16 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       query = query.limit(limit);
     }
     return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return EmployeeModel.fromMap(doc.data());
-      }).toList();
+      return snapshot.docs
+          .map((doc) => EmployeeModel.fromMap(doc.data()))
+          .where((emp) => includeDeleted ? emp.isDeleted : !emp.isDeleted)
+          .toList();
     });
+  }
+
+  @override
+  Stream<List<EmployeeModel>> streamArchivedEmployees(String companyId) {
+    return streamEmployees(companyId, includeDeleted: true);
   }
 
   @override
@@ -209,5 +215,130 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
         .limit(1)
         .get();
     return query.docs.isNotEmpty;
+  }
+
+  @override
+  Future<void> softDeleteEmployee({
+    required String companyId,
+    required String employeeId,
+    required String deletedByUid,
+    required String deletedByName,
+    String? reason,
+  }) async {
+    final empDoc = await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('employees')
+        .doc(employeeId)
+        .get();
+
+    if (!empDoc.exists) throw Exception('Employee record not found.');
+    final uid = empDoc.data()?['uid'] as String?;
+    final nowStr = DateTime.now().toIso8601String();
+
+    // 1. Mark employee as soft-deleted in company subcollection
+    await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('employees')
+        .doc(employeeId)
+        .update({
+      'isDeleted': true,
+      'status': 'Inactive',
+      'deletedAt': nowStr,
+      'deletedByUid': deletedByUid,
+      'deletedByName': deletedByName,
+      'deletionReason': reason,
+      'updatedAt': nowStr,
+    });
+
+    // 2. Mark user document as inactive if present
+    if (uid != null && uid.isNotEmpty) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'status': 'Inactive',
+        'isDeleted': true,
+        'updatedAt': nowStr,
+      }, SetOptions(merge: true));
+
+      // 3. Disable user login in Firebase Auth
+      try {
+        await FirebaseFunctions.instance.httpsCallable('disableUser').call({
+          'uid': uid,
+          'companyId': companyId,
+          'employeeId': employeeId,
+        });
+      } catch (_) {}
+    }
+  }
+
+  @override
+  Future<void> restoreEmployee({
+    required String companyId,
+    required String employeeId,
+  }) async {
+    // 1. Capacity check
+    final companyDoc = await FirebaseFirestore.instance.collection('companies').doc(companyId).get();
+    final maxEmployees = companyDoc.data()?['maxEmployees'] as int? ?? 50;
+
+    final activeEmployeesSnap = await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('employees')
+        .get();
+
+    final activeCount = activeEmployeesSnap.docs.where((doc) {
+      final data = doc.data();
+      return (data['isDeleted'] ?? false) == false && (data['status'] ?? 'Active') == 'Active';
+    }).length;
+
+    if (activeCount >= maxEmployees) {
+      throw Exception(
+        'Cannot restore employee: Seat limit reached ($activeCount/$maxEmployees). Please upgrade your employee seat capacity or remove an active employee first.',
+      );
+    }
+
+    final empDoc = await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('employees')
+        .doc(employeeId)
+        .get();
+
+    if (!empDoc.exists) throw Exception('Employee record not found.');
+    final uid = empDoc.data()?['uid'] as String?;
+    final nowStr = DateTime.now().toIso8601String();
+
+    // 2. Mark employee document as active again
+    await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('employees')
+        .doc(employeeId)
+        .update({
+      'isDeleted': false,
+      'status': 'Active',
+      'deletedAt': null,
+      'deletedByUid': null,
+      'deletedByName': null,
+      'deletionReason': null,
+      'updatedAt': nowStr,
+    });
+
+    // 3. Re-enable user in Firestore and Firebase Auth
+    if (uid != null && uid.isNotEmpty) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'status': 'Active',
+        'isDeleted': false,
+        'updatedAt': nowStr,
+      }, SetOptions(merge: true));
+
+      try {
+        await FirebaseFunctions.instance.httpsCallable('enableUser').call({
+          'uid': uid,
+          'companyId': companyId,
+          'employeeId': employeeId,
+        });
+      } catch (_) {}
+    }
   }
 }

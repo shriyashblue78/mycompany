@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/responsive_widgets.dart';
 import '../../../../core/utils/file_saver.dart';
@@ -12,16 +11,23 @@ import '../../domain/models/sale_model.dart';
 import '../providers/sales_provider.dart';
 import '../utils/sale_invoice_pdf_generator.dart';
 
-class SaleDetailViewScreen extends ConsumerWidget {
+class SaleDetailViewScreen extends ConsumerStatefulWidget {
   final String saleId;
   const SaleDetailViewScreen({super.key, required this.saleId});
 
-  static Future<void> generateAndDownloadPdf(BuildContext context, SaleModel sale, String companyName) async {
+  static Future<void> generateAndDownloadPdf(
+    BuildContext context,
+    SaleModel sale,
+    String companyName, {
+    List<InvoiceCopyType> copyTypes = const [InvoiceCopyType.original],
+  }) async {
     final bytes = await SaleInvoicePdfGenerator.generatePdf(
       sale: sale,
       companyName: companyName,
+      copyTypes: copyTypes,
     );
-    final fileName = 'Invoice_${sale.invoiceNumber ?? sale.saleNumber}.pdf';
+    final copySuffix = copyTypes.length == 1 ? copyTypes.first.displayName : 'MULTI_COPY';
+    final fileName = 'Invoice_${sale.invoiceNumber ?? sale.saleNumber}_$copySuffix.pdf';
     await saveFile(bytes, fileName, 'application/pdf');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -30,10 +36,108 @@ class SaleDetailViewScreen extends ConsumerWidget {
     }
   }
 
+  static Future<void> showCopySelectorAndGeneratePdf(
+    BuildContext context,
+    SaleModel sale,
+    String companyName,
+  ) async {
+    final selectedCopies = <InvoiceCopyType>{InvoiceCopyType.original};
+
+    final result = await showDialog<Set<InvoiceCopyType>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final theme = Theme.of(context);
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.picture_as_pdf_rounded, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text('Generate Tax Invoice'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Copy Type:',
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: InvoiceCopyType.values.map((type) {
+                      final isSelected = selectedCopies.contains(type);
+                      return FilterChip(
+                        selected: isSelected,
+                        label: Text(type.displayName),
+                        selectedColor: theme.colorScheme.primaryContainer,
+                        checkmarkColor: theme.colorScheme.primary,
+                        labelStyle: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? theme.colorScheme.onPrimaryContainer : null,
+                          fontSize: 12,
+                        ),
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              selectedCopies.add(type);
+                            } else if (selectedCopies.length > 1) {
+                              selectedCopies.remove(type);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Selected ${selectedCopies.length} copy designation(s) will be generated.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Generate A4 PDF'),
+                  onPressed: () => Navigator.of(ctx).pop(selectedCopies),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null && result.isNotEmpty && context.mounted) {
+      await generateAndDownloadPdf(
+        context,
+        sale,
+        companyName,
+        copyTypes: result.toList(),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SaleDetailViewScreen> createState() => _SaleDetailViewScreenState();
+}
+
+class _SaleDetailViewScreenState extends ConsumerState<SaleDetailViewScreen> {
+  final Set<InvoiceCopyType> _selectedCopyTypes = {InvoiceCopyType.original};
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final saleDetailsAsync = ref.watch(saleDetailsStreamProvider(saleId));
+    final saleDetailsAsync = ref.watch(saleDetailsStreamProvider(widget.saleId));
     final authState = ref.watch(authProvider);
     final companyName = authState.selectedCompany ?? 'Apex Industries';
 
@@ -48,7 +152,12 @@ class SaleDetailViewScreen extends ConsumerWidget {
               return IconButton(
                 icon: const Icon(Icons.print_rounded),
                 tooltip: 'Download A4 Invoice PDF',
-                onPressed: () => generateAndDownloadPdf(context, sale, companyName),
+                onPressed: () => SaleDetailViewScreen.generateAndDownloadPdf(
+                  context,
+                  sale,
+                  companyName,
+                  copyTypes: _selectedCopyTypes.toList(),
+                ),
               );
             },
             orElse: () => const SizedBox.shrink(),
@@ -85,6 +194,55 @@ class SaleDetailViewScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Copy Type Selector Bar
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: theme.dividerColor.withAlpha(60)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Copy Type:',
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: InvoiceCopyType.values.map((type) {
+                                  final isSelected = _selectedCopyTypes.contains(type);
+                                  return FilterChip(
+                                    selected: isSelected,
+                                    label: Text(type.displayName),
+                                    selectedColor: theme.colorScheme.primaryContainer,
+                                    checkmarkColor: theme.colorScheme.primary,
+                                    labelStyle: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected ? theme.colorScheme.onPrimaryContainer : null,
+                                      fontSize: 12,
+                                    ),
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        if (selected) {
+                                          _selectedCopyTypes.add(type);
+                                        } else if (_selectedCopyTypes.length > 1) {
+                                          _selectedCopyTypes.remove(type);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Document Header
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -299,7 +457,12 @@ class SaleDetailViewScreen extends ConsumerWidget {
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton.icon(
-                            onPressed: () => generateAndDownloadPdf(context, sale, companyName),
+                            onPressed: () => SaleDetailViewScreen.generateAndDownloadPdf(
+                              context,
+                              sale,
+                              companyName,
+                              copyTypes: _selectedCopyTypes.toList(),
+                            ),
                             icon: const Icon(Icons.print_rounded),
                             label: const Text('Download / Print A4 Document'),
                           ),

@@ -111,5 +111,49 @@ void main() {
       expect(pdfBytes, isNotNull);
       expect(pdfBytes.length, greaterThan(0));
     });
+
+    test('Generates multi-page PDF when ORIGINAL, DUPLICATE, and TRIPLICATE are all selected', () async {
+      final sampleSale = SaleModel(
+        saleId: 'SALE_003',
+        companyId: 'COMP_001',
+        saleNumber: 'SAL-0003',
+        invoiceNumber: '170',
+        customerName: 'RUDRA FARMS AND PROCESSING PVT LTD',
+        customerPhone: '9876543210',
+        address: 'PLOT NO D3/1/1,MIDC DEORI',
+        gstin: '27AAGCR2760P1ZT',
+        state: 'MAHARASHTRA',
+        stateCode: '27',
+        itemName: 'ROTOR-400',
+        quantity: 5.0,
+        unit: 'Nos',
+        pricePerUnit: 12000.0,
+        totalAmount: 60000.0,
+        saleDate: DateTime(2026, 9, 1),
+        remarks: 'All 3 copy types',
+        status: 'Delivered',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final pdfBytesSingle = await SaleInvoicePdfGenerator.generatePdf(
+        sale: sampleSale,
+        companyName: 'S. M. ENGINEERING',
+        copyTypes: [InvoiceCopyType.original],
+      );
+
+      final pdfBytesMulti = await SaleInvoicePdfGenerator.generatePdf(
+        sale: sampleSale,
+        companyName: 'S. M. ENGINEERING',
+        copyTypes: [
+          InvoiceCopyType.original,
+          InvoiceCopyType.duplicate,
+          InvoiceCopyType.triplicate,
+        ],
+      );
+
+      expect(pdfBytesSingle.length, greaterThan(0));
+      expect(pdfBytesMulti.length, greaterThan(pdfBytesSingle.length));
+    });
   });
 }

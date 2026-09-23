@@ -20,6 +20,13 @@ class EmployeeModel {
   final String currentAddress;
   final String alternatePhone;
 
+  // Soft Delete Metadata
+  final bool isDeleted;
+  final DateTime? deletedAt;
+  final String? deletedByUid;
+  final String? deletedByName;
+  final String? deletionReason;
+
   const EmployeeModel({
     required this.employeeId,
     required this.uid,
@@ -41,6 +48,11 @@ class EmployeeModel {
     this.permanentAddress = '',
     this.currentAddress = '',
     this.alternatePhone = '',
+    this.isDeleted = false,
+    this.deletedAt,
+    this.deletedByUid,
+    this.deletedByName,
+    this.deletionReason,
   });
 
   factory EmployeeModel.fromMap(Map<String, dynamic> map) {
@@ -73,6 +85,13 @@ class EmployeeModel {
       permanentAddress: (map['permanentAddress'] ?? '') as String,
       currentAddress: (map['currentAddress'] ?? '') as String,
       alternatePhone: (map['alternatePhone'] ?? '') as String,
+      isDeleted: (map['isDeleted'] ?? false) as bool,
+      deletedAt: map['deletedAt'] != null
+          ? DateTime.tryParse(map['deletedAt'] as String)
+          : null,
+      deletedByUid: map['deletedByUid'] as String?,
+      deletedByName: map['deletedByName'] as String?,
+      deletionReason: map['deletionReason'] as String?,
     );
   }
 
@@ -98,6 +117,11 @@ class EmployeeModel {
       'permanentAddress': permanentAddress,
       'currentAddress': currentAddress,
       'alternatePhone': alternatePhone,
+      'isDeleted': isDeleted,
+      'deletedAt': deletedAt?.toIso8601String(),
+      'deletedByUid': deletedByUid,
+      'deletedByName': deletedByName,
+      'deletionReason': deletionReason,
     };
   }
 
@@ -122,6 +146,11 @@ class EmployeeModel {
     String? permanentAddress,
     String? currentAddress,
     String? alternatePhone,
+    bool? isDeleted,
+    DateTime? deletedAt,
+    String? deletedByUid,
+    String? deletedByName,
+    String? deletionReason,
   }) {
     return EmployeeModel(
       employeeId: employeeId ?? this.employeeId,
@@ -144,6 +173,11 @@ class EmployeeModel {
       permanentAddress: permanentAddress ?? this.permanentAddress,
       currentAddress: currentAddress ?? this.currentAddress,
       alternatePhone: alternatePhone ?? this.alternatePhone,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deletedByUid: deletedByUid ?? this.deletedByUid,
+      deletedByName: deletedByName ?? this.deletedByName,
+      deletionReason: deletionReason ?? this.deletionReason,
     );
   }
 }

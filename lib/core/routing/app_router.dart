@@ -15,6 +15,7 @@ import '../../features/employee/domain/models/employee_model.dart';
 import '../../features/employee/presentation/screens/employee_list_screen.dart';
 import '../../features/employee/presentation/screens/employee_detail_screen.dart';
 import '../../features/employee/presentation/screens/employee_form_screen.dart';
+import '../../features/employee/presentation/screens/archived_employees_screen.dart';
 import '../../features/employee/presentation/screens/employee_performance_screen.dart';
 import '../../features/attendance/presentation/screens/attendance_dashboard_screen.dart';
 import '../../features/attendance/presentation/screens/mark_attendance_screen.dart';
@@ -69,6 +70,7 @@ import '../../features/party/presentation/screens/party_list_screen.dart';
 import '../../features/party/presentation/screens/party_form_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/reports/presentation/screens/reports_home_screen.dart';
+import '../../features/reports/presentation/screens/monthly_employee_work_report_screen.dart';
 import '../../features/machines/domain/models/machine_model.dart';
 import '../../features/machines/presentation/screens/machine_list_screen.dart';
 import '../../features/machines/presentation/screens/machine_form_screen.dart';
@@ -658,6 +660,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const EmployeeFormScreen(),
       ),
       GoRoute(
+        path: '/employees/archived',
+        name: 'employee_archived',
+        builder: (context, state) => const ArchivedEmployeesScreen(),
+      ),
+      GoRoute(
         path: '/employees/:id',
         name: 'employee_detail',
         builder: (context, state) {
@@ -1095,6 +1102,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/reports',
         name: 'reports',
         builder: (context, state) => const ReportsHomeScreen(),
+      ),
+      GoRoute(
+        path: '/reports/task-working-hours',
+        name: 'reports_task_working_hours',
+        builder: (context, state) => const MonthlyEmployeeWorkReportScreen(),
+      ),
+      GoRoute(
+        path: '/tasks/work-report',
+        name: 'tasks_work_report',
+        builder: (context, state) => const MonthlyEmployeeWorkReportScreen(),
       ),
       GoRoute(
         path: '/project-tracker',

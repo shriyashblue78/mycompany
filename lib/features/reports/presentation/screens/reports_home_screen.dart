@@ -388,6 +388,28 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
 
             const SizedBox(height: AppSizes.p16),
 
+            // Employee Task Working Hours Report Card
+            Card(
+              color: theme.colorScheme.primaryContainer.withAlpha(50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                side: BorderSide(color: theme.colorScheme.primary.withAlpha(60)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primary.withAlpha(30),
+                  child: Icon(Icons.timelapse_rounded, color: theme.colorScheme.primary),
+                ),
+                title: const Text('Monthly Employee Task Work Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Track actual working hours spent on assigned tasks and download monthly PDF reports.'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push('/reports/task-working-hours'),
+              ),
+            ),
+
+            const SizedBox(height: AppSizes.p16),
+
             // Small Line Chart for Sales Trend (This Month)
             Card(
               child: Padding(

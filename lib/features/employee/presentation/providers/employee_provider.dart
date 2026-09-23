@@ -114,7 +114,24 @@ final activeEmployeesCountProvider = StreamProvider<int>((ref) {
       .doc(companyId)
       .collection('employees')
       .snapshots()
-      .map((snap) => snap.docs.length);
+      .map((snap) {
+    return snap.docs.where((doc) {
+      final data = doc.data();
+      final isDeleted = (data['isDeleted'] ?? false) == true;
+      final status = (data['status'] ?? 'Active') as String;
+      return !isDeleted && status == 'Active';
+    }).length;
+  });
+});
+
+final archivedEmployeesProvider = StreamProvider<List<EmployeeModel>>((ref) {
+  final authState = ref.watch(authProvider);
+  final companyId = authState.user?.companyId;
+  if (companyId == null) {
+    return Stream.value([]);
+  }
+  final repository = ref.watch(employeeRepositoryProvider);
+  return repository.streamArchivedEmployees(companyId);
 });
 
 final currentCompanyStreamProvider = StreamProvider<CompanyModel?>((ref) {

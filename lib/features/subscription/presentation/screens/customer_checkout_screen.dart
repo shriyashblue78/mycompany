@@ -77,15 +77,18 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Confirm details before proceeding to payment integration',
+                      'Confirm plan details before proceeding to payment.',
                       style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(150)),
                     ),
                     const SizedBox(height: AppSizes.p24),
 
                     // Order Summary Card
                     Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(AppSizes.p20),
                         child: Column(
@@ -106,8 +109,8 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
 
                             _buildSummaryRow(theme, 'Selected Plan', plan.planName, isBold: true),
                             _buildSummaryRow(theme, 'Duration', duration.label),
-                            _buildSummaryRow(theme, 'Start Date', DateFormat('yyyy-MM-dd HH:mm').format(startDate)),
-                            _buildSummaryRow(theme, 'Calculated Expiry Date', DateFormat('yyyy-MM-dd HH:mm').format(calculatedExpiry), isHighlight: true),
+                            _buildSummaryRow(theme, 'Start Date', DateFormat('yyyy-MM-dd').format(startDate)),
+                            _buildSummaryRow(theme, 'Expiry Date', DateFormat('yyyy-MM-dd').format(calculatedExpiry), isHighlight: true),
                             const Divider(height: 24),
 
                             _buildSummaryRow(
@@ -125,13 +128,16 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                     // Included Features Accordion / Card
                     Card(
                       elevation: 1,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(AppSizes.p20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Included Plan Modules (${plan.enabledFeatures.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                            Text('Included Features (${plan.enabledFeatures.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             Wrap(
                               spacing: 8,
@@ -140,7 +146,7 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                                 final feat = FeatureMaster.getFeature(featKey);
                                 return Chip(
                                   avatar: const Icon(Icons.check_circle, size: 16, color: Colors.green),
-                                  label: Text(feat?.displayName ?? featKey),
+                                  label: Text(feat?.displayName ?? featKey, style: const TextStyle(fontSize: 12)),
                                   backgroundColor: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
                                 );
                               }).toList(),
@@ -151,22 +157,22 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                     ),
                     const SizedBox(height: AppSizes.p24),
 
-                    // Modular Integration-Ready Payment Card (No Fake Payment Gateway)
+                    // Payment Integration Card
                     Card(
-                      elevation: 2,
+                      elevation: 1,
                       color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F9FF),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: Colors.blue, width: 1.5),
+                        side: BorderSide(color: isDark ? Colors.blue.shade900 : Colors.blue.shade300, width: 1.5),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(AppSizes.p20),
                         child: Row(
                           children: [
                             const CircleAvatar(
-                              radius: 24,
+                              radius: 22,
                               backgroundColor: Colors.blue,
-                              child: Icon(Icons.payment_rounded, color: Colors.white),
+                              child: Icon(Icons.payment_rounded, color: Colors.white, size: 22),
                             ),
                             const SizedBox(width: AppSizes.p16),
                             Expanded(
@@ -174,12 +180,12 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Payment Gateway Integration Ready',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
+                                    'Payment Integration Ready',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.blue),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Payment provider will be connected in a future update. Submitting this order creates a pending transaction record.',
+                                    'Submitting this order creates a pending transaction record for your account.',
                                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(160)),
                                   ),
                                 ],
@@ -197,15 +203,16 @@ class _CustomerCheckoutScreenState extends ConsumerState<CustomerCheckoutScreen>
                       child: ElevatedButton(
                         onPressed: _submitting ? null : () => _submitPendingOrder(companyId, plan, duration),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
+                          backgroundColor: isDark ? theme.colorScheme.primary : Colors.black,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: _submitting
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
-                                'Submit Order (Integration Ready)',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                'Proceed to Payment',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                       ),
                     ),
