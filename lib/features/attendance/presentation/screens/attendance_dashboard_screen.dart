@@ -163,12 +163,13 @@ class AttendanceDashboardScreen extends ConsumerWidget {
       loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
       error: (err, _) => Center(child: Text('Error loading stats: $err', style: const TextStyle(color: AppColors.error))),
       data: (stats) {
+        // label, value, icon, color, statusFilter
         final statItems = [
-          _StatItem('Total Staff', '${stats.totalEmployees}', Icons.people, Colors.blue),
-          _StatItem('Present Today', '${stats.present}', Icons.check_circle_rounded, AppColors.success),
-          _StatItem('Absent Today', '${stats.absent}', Icons.cancel_rounded, AppColors.error),
-          _StatItem('Late Today', '${stats.lateCount}', Icons.warning_rounded, AppColors.warning),
-          _StatItem('On Leave', '${stats.onLeave}', Icons.time_to_leave_rounded, Colors.purple),
+          _StatItem('Total Staff', '${stats.totalEmployees}', Icons.people, Colors.blue, 'All'),
+          _StatItem('Present Today', '${stats.present}', Icons.check_circle_rounded, AppColors.success, 'Present'),
+          _StatItem('Absent Today', '${stats.absent}', Icons.cancel_rounded, AppColors.error, 'Absent'),
+          _StatItem('Late Today', '${stats.lateCount}', Icons.warning_rounded, AppColors.warning, 'Late'),
+          _StatItem('On Leave', '${stats.onLeave}', Icons.time_to_leave_rounded, Colors.purple, 'Leave'),
         ];
 
         return GridView.builder(
@@ -183,37 +184,49 @@ class AttendanceDashboardScreen extends ConsumerWidget {
           itemCount: statItems.length,
           itemBuilder: (context, index) {
             final item = statItems[index];
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-                side: BorderSide(color: Colors.grey.shade300, width: 1),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16, vertical: AppSizes.p12),
-                child: Row(
-                  children: [
-                    Icon(item.icon, color: item.color, size: 30),
-                    const SizedBox(width: AppSizes.p12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item.value,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            item.label,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+            return InkWell(
+              borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+              onTap: () {
+                ref.read(attendanceStatusFilterProvider.notifier).state = item.statusFilter;
+                ref.read(attendanceSearchNameQueryProvider.notifier).state = '';
+                ref.read(attendanceSearchDepartmentProvider.notifier).state = 'All';
+                ref.read(attendanceSearchDateProvider.notifier).state = DateTime.now();
+                context.push('/attendance/today');
+              },
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+                  side: BorderSide(color: item.color.withValues(alpha: 0.35), width: 1.5),
+                ),
+                color: item.color.withValues(alpha: 0.06),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16, vertical: AppSizes.p12),
+                  child: Row(
+                    children: [
+                      Icon(item.icon, color: item.color, size: 30),
+                      const SizedBox(width: AppSizes.p12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              item.value,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: item.color),
+                            ),
+                            Text(
+                              item.label,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      Icon(Icons.chevron_right_rounded, color: item.color.withValues(alpha: 0.5), size: 18),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -447,8 +460,9 @@ class _StatItem {
   final String value;
   final IconData icon;
   final Color color;
+  final String statusFilter;
 
-  _StatItem(this.label, this.value, this.icon, this.color);
+  _StatItem(this.label, this.value, this.icon, this.color, this.statusFilter);
 }
 
 class _ModuleData {

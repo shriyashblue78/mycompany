@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "build": 1,
+  "apk_url": "/downloads/app-arm64-v8a-release.apk",
+  "apk_filename": "MyCompanyERP-v1.0.0.apk",
+  "release_date": "2026-09-30",
+  "notes": "Initial release. Update apk_url to point to the latest APK when a new build is released."
+}

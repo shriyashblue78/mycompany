@@ -111,10 +111,10 @@ class _PurchaseListScreenState extends ConsumerState<PurchaseListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: MobileStatRow(
                     cards: [
-                      MobileStatCard(label: "Today", value: '\$${stats.todaySum.toStringAsFixed(0)}', icon: Icons.today_rounded, color: Colors.teal),
-                      MobileStatCard(label: "This Month", value: '\$${stats.monthSum.toStringAsFixed(0)}', icon: Icons.calendar_month_rounded, color: Colors.blue),
+                      MobileStatCard(label: "Today", value: '₹${stats.todaySum.toStringAsFixed(0)}', icon: Icons.today_rounded, color: Colors.teal),
+                      MobileStatCard(label: "This Month", value: '₹${stats.monthSum.toStringAsFixed(0)}', icon: Icons.calendar_month_rounded, color: Colors.blue),
                       MobileStatCard(label: "Today's Count", value: '${stats.todayCount}', icon: Icons.receipt_rounded, color: Colors.indigo),
-                      MobileStatCard(label: "Total Spent", value: '\$${stats.totalSum.toStringAsFixed(0)}', icon: Icons.monetization_on_rounded, color: Colors.purple),
+                      MobileStatCard(label: "Total Spent", value: '₹${stats.totalSum.toStringAsFixed(0)}', icon: Icons.monetization_on_rounded, color: Colors.purple),
                     ],
                   ),
                 ),

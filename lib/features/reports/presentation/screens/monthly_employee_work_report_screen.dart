@@ -128,7 +128,7 @@ class _MonthlyEmployeeWorkReportScreenState extends ConsumerState<MonthlyEmploye
                         const SizedBox(height: AppSizes.p24),
 
                         // Summary Metric Cards
-                        _buildMetricsCards(theme, isDark, employeeTasks.length, monthlyTotalMinutes),
+                        _buildMetricsCards(context, theme, isDark, employeeTasks.length, monthlyTotalMinutes),
                         const SizedBox(height: AppSizes.p24),
 
                         // Report Header Note
@@ -308,44 +308,39 @@ class _MonthlyEmployeeWorkReportScreenState extends ConsumerState<MonthlyEmploye
     );
   }
 
-  Widget _buildMetricsCards(ThemeData theme, bool isDark, int taskCount, int totalMinutes) {
+  Widget _buildMetricsCards(BuildContext context, ThemeData theme, bool isDark, int taskCount, int totalMinutes) {
     final avgMinutes = taskCount > 0 ? totalMinutes ~/ taskCount : 0;
 
-    return Row(
-      children: [
-        Expanded(
-          child: _buildMetricCard(
-            theme,
-            isDark,
-            'Completed Tasks',
-            '$taskCount',
-            Icons.task_alt_rounded,
-            Colors.blue,
-          ),
-        ),
-        const SizedBox(width: AppSizes.p16),
-        Expanded(
-          child: _buildMetricCard(
-            theme,
-            isDark,
-            'Total Task Working Time',
-            EmployeeWorkReportPdfGenerator.formatMinutes(totalMinutes),
-            Icons.timelapse_rounded,
-            Colors.green,
-          ),
-        ),
-        const SizedBox(width: AppSizes.p16),
-        Expanded(
-          child: _buildMetricCard(
-            theme,
-            isDark,
-            'Avg Time per Task',
-            EmployeeWorkReportPdfGenerator.formatMinutes(avgMinutes),
-            Icons.av_timer_rounded,
-            Colors.orange,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 550;
+
+        Widget card(String label, String value, IconData icon, Color color) =>
+            _buildMetricCard(theme, isDark, label, value, icon, color);
+
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              card('Completed Tasks', '$taskCount', Icons.task_alt_rounded, Colors.blue),
+              const SizedBox(height: AppSizes.p12),
+              card('Total Working Time', EmployeeWorkReportPdfGenerator.formatMinutes(totalMinutes), Icons.timelapse_rounded, Colors.green),
+              const SizedBox(height: AppSizes.p12),
+              card('Avg Time / Task', EmployeeWorkReportPdfGenerator.formatMinutes(avgMinutes), Icons.av_timer_rounded, Colors.orange),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: card('Completed Tasks', '$taskCount', Icons.task_alt_rounded, Colors.blue)),
+            const SizedBox(width: AppSizes.p16),
+            Expanded(child: card('Total Working Time', EmployeeWorkReportPdfGenerator.formatMinutes(totalMinutes), Icons.timelapse_rounded, Colors.green)),
+            const SizedBox(width: AppSizes.p16),
+            Expanded(child: card('Avg Time / Task', EmployeeWorkReportPdfGenerator.formatMinutes(avgMinutes), Icons.av_timer_rounded, Colors.orange)),
+          ],
+        );
+      },
     );
   }
 
@@ -358,7 +353,7 @@ class _MonthlyEmployeeWorkReportScreenState extends ConsumerState<MonthlyEmploye
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(AppSizes.p20),
+      padding: const EdgeInsets.all(AppSizes.p16),
       decoration: BoxDecoration(
         color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(AppSizes.cardRadius),
@@ -368,21 +363,22 @@ class _MonthlyEmployeeWorkReportScreenState extends ConsumerState<MonthlyEmploye
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withAlpha(30),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: AppSizes.p16),
+          const SizedBox(width: AppSizes.p12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   label,
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 4),
                 Text(

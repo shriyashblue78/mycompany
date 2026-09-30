@@ -382,7 +382,7 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
                 if (isLowStockEnabled)
                   _buildSummaryCard('Low Stock', '$lowStockItems', Icons.inventory_2, Colors.amber),
                 _buildSummaryCard('Running Productions', '$runningTotal', Icons.precision_manufacturing, Colors.green),
-                _buildSummaryCard('Today\'s Sales', '\$$salesAmountToday', Icons.sell, Colors.teal),
+                _buildSummaryCard('Today\'s Sales', '₹${salesAmountToday.toStringAsFixed(0)}', Icons.sell, Colors.teal),
               ],
             ),
 
@@ -476,8 +476,8 @@ class _ReportsHomeScreenState extends ConsumerState<ReportsHomeScreen> {
                           _buildDataRow('Production', 'Running', '$runningToday', '$runningMonth', '$runningTotal'),
                           _buildDataRow('Production', 'Completed', '$completedToday', '$completedMonth', '$completedTotal'),
                           _buildDataRow('Production', 'Cancelled', '$cancelledToday', '$cancelledMonth', '$cancelledTotal'),
-                          _buildDataRow('Purchase', 'Amount', '\$$purchaseAmountToday', '\$$purchaseAmountMonth', '\$$purchaseAmountTotal'),
-                          _buildDataRow('Sales', 'Amount', '\$$salesAmountToday', '\$$salesAmountMonth', '\$$salesAmountTotal'),
+                          _buildDataRow('Purchase', 'Amount', '₹${purchaseAmountToday.toStringAsFixed(0)}', '₹${purchaseAmountMonth.toStringAsFixed(0)}', '₹${purchaseAmountTotal.toStringAsFixed(0)}'),
+                          _buildDataRow('Sales', 'Amount', '₹${salesAmountToday.toStringAsFixed(0)}', '₹${salesAmountMonth.toStringAsFixed(0)}', '₹${salesAmountTotal.toStringAsFixed(0)}'),
                         ],
                       ),
                     ),

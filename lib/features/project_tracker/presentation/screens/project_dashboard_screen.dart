@@ -233,33 +233,36 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
       children: [
         const Text('Focus Area: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
         const SizedBox(width: 8),
-        Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedDepartment,
-              items: [
-                const DropdownMenuItem(value: 'All', child: Text('All Pipeline (Overview)', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Marketing') const DropdownMenuItem(value: 'Marketing', child: Text('Marketing', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Design') const DropdownMenuItem(value: 'Design', child: Text('Design', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Purchase') const DropdownMenuItem(value: 'Purchase', child: Text('Purchase', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Machining') const DropdownMenuItem(value: 'Machining', child: Text('Machining', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Assembly') const DropdownMenuItem(value: 'Assembly', child: Text('Assembly', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Quality') const DropdownMenuItem(value: 'Quality', child: Text('Quality', style: TextStyle(fontSize: 13))),
-                if (isManager || userDeptMapped == 'Accounts') const DropdownMenuItem(value: 'Accounts', child: Text('Accounts', style: TextStyle(fontSize: 13))),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _selectedDepartment = val;
-                  });
-                }
-              },
+        Expanded(
+          child: Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedDepartment,
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem(value: 'All', child: Text('All Pipeline (Overview)', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Marketing') const DropdownMenuItem(value: 'Marketing', child: Text('Marketing', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Design') const DropdownMenuItem(value: 'Design', child: Text('Design', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Purchase') const DropdownMenuItem(value: 'Purchase', child: Text('Purchase', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Machining') const DropdownMenuItem(value: 'Machining', child: Text('Machining', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Assembly') const DropdownMenuItem(value: 'Assembly', child: Text('Assembly', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Quality') const DropdownMenuItem(value: 'Quality', child: Text('Quality', style: TextStyle(fontSize: 13))),
+                  if (isManager || userDeptMapped == 'Accounts') const DropdownMenuItem(value: 'Accounts', child: Text('Accounts', style: TextStyle(fontSize: 13))),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedDepartment = val;
+                    });
+                  }
+                },
+              ),
             ),
           ),
         ),
@@ -289,7 +292,7 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: AppSizes.p12,
               mainAxisSpacing: AppSizes.p12,
-              childAspectRatio: crossAxisCount == 2 ? 2.2 : 3.2,
+              childAspectRatio: crossAxisCount == 2 ? 1.4 : 3.2,
               children: [
                 _buildStatCard('Total Projects', total.toString(), 'All time', Icons.folder_rounded, Colors.blue, theme, isDark),
                 _buildStatCard('Planned', planned.toString(), 'Not started', Icons.pending_actions_rounded, Colors.purple, theme, isDark),
@@ -310,41 +313,31 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, height: 1.1),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -353,96 +346,116 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
 
   Widget _buildFilterControls(BuildContext context, ThemeData theme, bool isDark) {
     final statusFilter = ref.watch(projectStatusFilterProvider);
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final searchField = SizedBox(
+      height: 40,
+      child: TextField(
+        onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
+        decoration: InputDecoration(
+          hintText: 'Search projects by name, code, or client...',
+          prefixIcon: const Icon(Icons.search_rounded, size: 18),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        ),
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
+
+    final statusDropdown = Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.filter_alt_outlined, color: Colors.grey.shade600, size: 16),
+          const SizedBox(width: 6),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: statusFilter ?? 'All',
+              items: <String>['All', 'Planned', 'In Progress', 'Completed', 'On Hold']
+                  .map((status) => DropdownMenuItem<String>(
+                        value: status,
+                        child: Text(status == 'All' ? 'All Projects' : status, style: const TextStyle(fontSize: 13)),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                ref.read(projectStatusFilterProvider.notifier).state = val == 'All' ? null : val;
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final sortDropdown = Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: 'Latest First',
+          items: const [
+            DropdownMenuItem(value: 'Latest First', child: Text('Sort: Latest First', style: TextStyle(fontSize: 13))),
+          ],
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    final viewButtons = Container(
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.grid_on_rounded, size: 16, color: Colors.green),
+            onPressed: () {},
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+          ),
+          Container(width: 1, height: 24, color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+          IconButton(
+            icon: const Icon(Icons.list_rounded, size: 18, color: Colors.grey),
+            onPressed: () {},
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+          ),
+        ],
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          searchField,
+          const SizedBox(height: 8),
+          statusDropdown,
+        ],
+      );
+    }
 
     return Row(
       children: [
-        Expanded(
-          child: Container(
-            height: 40,
-            child: TextField(
-              onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
-              decoration: InputDecoration(
-                hintText: 'Search projects by name, code, or client...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-              ),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-        ),
+        Expanded(child: searchField),
         const SizedBox(width: 12),
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.filter_alt_outlined, color: Colors.grey.shade600, size: 16),
-              const SizedBox(width: 6),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: statusFilter ?? 'All',
-                  items: <String>['All', 'Planned', 'In Progress', 'Completed', 'On Hold']
-                      .map((status) => DropdownMenuItem<String>(
-                            value: status,
-                            child: Text(status == 'All' ? 'All Projects' : status, style: const TextStyle(fontSize: 13)),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    ref.read(projectStatusFilterProvider.notifier).state = val == 'All' ? null : val;
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+        statusDropdown,
         const SizedBox(width: 12),
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: 'Latest First',
-              items: const [
-                DropdownMenuItem(value: 'Latest First', child: Text('Sort: Latest First', style: TextStyle(fontSize: 13))),
-              ],
-              onChanged: (_) {},
-            ),
-          ),
-        ),
+        sortDropdown,
         const SizedBox(width: 12),
-        Container(
-          height: 40,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.grid_on_rounded, size: 16, color: Colors.green),
-                onPressed: () {},
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
-              ),
-              Container(width: 1, height: 24, color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-              IconButton(
-                icon: const Icon(Icons.list_rounded, size: 18, color: Colors.grey),
-                onPressed: () {},
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 40),
-              ),
-            ],
-          ),
-        ),
+        viewButtons,
       ],
     );
   }

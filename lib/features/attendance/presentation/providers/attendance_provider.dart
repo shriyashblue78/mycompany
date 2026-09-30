@@ -166,6 +166,8 @@ final todayAttendanceStatsProvider = Provider<AsyncValue<AttendanceStats>>((ref)
 final attendanceSearchNameQueryProvider = StateProvider<String>((ref) => '');
 final attendanceSearchDepartmentProvider = StateProvider<String>((ref) => 'All');
 final attendanceSearchDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+// 'All' | 'Present' | 'Absent' | 'Late' | 'Leave'
+final attendanceStatusFilterProvider = StateProvider<String>((ref) => 'All');
 
 // Joined Model containing both Attendance and Employee details
 class JoinedAttendanceRecord {
@@ -186,6 +188,7 @@ final searchedAttendanceProvider = Provider<AsyncValue<List<JoinedAttendanceReco
   final nameQuery = ref.watch(attendanceSearchNameQueryProvider).trim().toLowerCase();
   final departmentFilter = ref.watch(attendanceSearchDepartmentProvider);
   final targetDate = ref.watch(attendanceSearchDateProvider);
+  final statusFilter = ref.watch(attendanceStatusFilterProvider);
 
   if (employeesAsync is AsyncLoading || companyAttendanceAsync is AsyncLoading) {
     return const AsyncValue.loading();
@@ -239,6 +242,16 @@ final searchedAttendanceProvider = Provider<AsyncValue<List<JoinedAttendanceReco
     // Apply Department Filter
     if (departmentFilter != 'All' && employee.department != departmentFilter) {
       continue;
+    }
+
+    // Apply Status Filter
+    if (statusFilter != 'All') {
+      final recStatus = record.status.toLowerCase();
+      final filterLower = statusFilter.toLowerCase();
+      if (filterLower == 'present' && recStatus != 'present') continue;
+      if (filterLower == 'absent' && recStatus != 'absent') continue;
+      if (filterLower == 'late' && recStatus != 'late') continue;
+      if (filterLower == 'leave' && recStatus != 'leave') continue;
     }
 
     joinedList.add(JoinedAttendanceRecord(

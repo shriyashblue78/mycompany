@@ -593,8 +593,11 @@ class _InwardOutwardFormScreenState extends ConsumerState<InwardOutwardFormScree
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 12,
+                            runSpacing: 10,
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,7 +615,7 @@ class _InwardOutwardFormScreenState extends ConsumerState<InwardOutwardFormScree
                               ElevatedButton.icon(
                                 onPressed: _showChallanSourcePicker,
                                 icon: const Icon(Icons.add_a_photo_rounded, size: 18),
-                                label: const Text('Add Challan Photos'),
+                                label: Text(isMobile ? 'Add Challan' : 'Add Challan Photos'),
                               ),
                             ],
                           ),
@@ -681,8 +684,11 @@ class _InwardOutwardFormScreenState extends ConsumerState<InwardOutwardFormScree
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 12,
+                            runSpacing: 10,
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -700,7 +706,7 @@ class _InwardOutwardFormScreenState extends ConsumerState<InwardOutwardFormScree
                               ElevatedButton.icon(
                                 onPressed: _pickMaterialPhotos,
                                 icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-                                label: const Text('Add Material Photos'),
+                                label: Text(isMobile ? 'Add Material' : 'Add Material Photos'),
                               ),
                             ],
                           ),
