@@ -5,6 +5,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
+import '../../../../core/widgets/mobile_apk_download_banner.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -104,215 +105,229 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSizes.p24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
-            padding: const EdgeInsets.all(AppSizes.p32),
-            decoration: BoxDecoration(
-              color: isDark ? theme.colorScheme.surface : Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: isDark
-                  ? []
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.015),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-              border: Border.all(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                width: 1.5,
-              ),
-            ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // App Branding Logo
-                  Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSizes.p16),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: theme.colorScheme.primary.withOpacity(0.12),
-                            width: 1.5,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Login Card ──────────────────────────────────────────
+              Container(
+                constraints: const BoxConstraints(maxWidth: 440),
+                padding: const EdgeInsets.all(AppSizes.p32),
+                decoration: BoxDecoration(
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: isDark
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.015),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
                           ),
-                        ),
-                        child: Icon(
-                          Icons.precision_manufacturing_outlined,
-                          size: 44,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: AppSizes.p16),
-                      Text(
-                        AppStrings.appName,
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Smart Enterprise Management',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
+                        ],
+                  border: Border.all(
+                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                    width: 1.5,
                   ),
-                  const SizedBox(height: AppSizes.p32),
-                  
-                  // Title
-                  Text(
-                    AppStrings.loginTitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    AppStrings.loginSubtitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.p24),
-
-                  if (_errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(AppSizes.p12),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                        border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: isDark ? Colors.red.shade300 : Colors.red.shade700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.p16),
-                  ],
-
-                  // Email Input
-                  CustomTextField(
-                    labelText: 'Email Address',
-                    hintText: 'name@company.com',
-                    prefixIcon: Icons.email_outlined,
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (val) {
-                      if (val == null || val.isEmpty) {
-                        return 'Email is required';
-                      }
-                      if (!val.contains('@')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSizes.p16),
-
-                  // Password / PIN Input
-                  CustomTextField(
-                    labelText: 'Password / PIN',
-                    hintText: 'Enter password or PIN',
-                    prefixIcon: Icons.lock_outline,
-                    isPassword: true,
-                    controller: _passwordController,
-                    validator: (val) {
-                      if (val == null || val.isEmpty) {
-                        return 'Password / PIN is required';
-                      }
-                      if (val.length < 4) {
-                        return 'Password or PIN must be at least 4 characters';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AppSizes.p16),
-
-                  // Remember me & Forgot Password Wrap
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 16,
-                    runSpacing: 8,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+                      // App Branding Logo
+                      Column(
                         children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              activeColor: theme.colorScheme.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
+                          Container(
+                            padding: const EdgeInsets.all(AppSizes.p16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                width: 1.5,
                               ),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() {
-                                    _rememberMe = val;
-                                  });
-                                }
-                              },
+                            ),
+                            child: Icon(
+                              Icons.precision_manufacturing_outlined,
+                              size: 44,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: AppSizes.p16),
                           Text(
-                            'Remember Me',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            AppStrings.appName,
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Smart Enterprise Management',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
-                      TextButton(
-                        onPressed: _handleForgotPassword,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      const SizedBox(height: AppSizes.p32),
+                      
+                      // Title
+                      Text(
+                        AppStrings.loginTitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        AppStrings.loginSubtitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.p24),
+
+                      if (_errorMessage != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSizes.p12),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                            border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
+                        const SizedBox(height: AppSizes.p16),
+                      ],
+
+                      // Email Input
+                      CustomTextField(
+                        labelText: 'Email Address',
+                        hintText: 'name@company.com',
+                        prefixIcon: Icons.email_outlined,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (val) {
+                          if (val == null || val.isEmpty) {
+                            return 'Email is required';
+                          }
+                          if (!val.contains('@')) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // Password / PIN Input
+                      CustomTextField(
+                        labelText: 'Password / PIN',
+                        hintText: 'Enter password or PIN',
+                        prefixIcon: Icons.lock_outline,
+                        isPassword: true,
+                        controller: _passwordController,
+                        validator: (val) {
+                          if (val == null || val.isEmpty) {
+                            return 'Password / PIN is required';
+                          }
+                          if (val.length < 4) {
+                            return 'Password or PIN must be at least 4 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSizes.p16),
+
+                      // Remember me & Forgot Password Wrap
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: theme.colorScheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _rememberMe = val;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Remember Me',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontSize: 14,
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton(
+                            onPressed: _handleForgotPassword,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Forgot Password?',
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.p24),
+
+                      // Submit Button
+                      CustomButton(
+                        text: AppStrings.loginButton,
+                        isLoading: _isLoading,
+                        onPressed: _handleLogin,
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSizes.p24),
-
-                  // Submit Button
-                  CustomButton(
-                    text: AppStrings.loginButton,
-                    isLoading: _isLoading,
-                    onPressed: _handleLogin,
-                  ),
-                ],
+                ),
               ),
-            ),
+
+              // ── Android APK Download Banner (mobile only) ─────────
+              // This widget is completely invisible on desktop browsers.
+              // Only shown on Android/mobile web.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: const MobileApkDownloadBanner(),
+              ),
+            ],
           ),
         ),
       ),

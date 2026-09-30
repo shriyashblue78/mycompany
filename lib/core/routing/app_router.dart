@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/download_app_screen.dart';
 import '../../features/auth/presentation/screens/company_blocked_screen.dart';
 import '../../features/auth/presentation/screens/feature_locked_screen.dart';
 import '../../features/project_tracker/domain/models/project_tracker_config.dart';
@@ -124,8 +125,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Check if user is logged in
       if (!currentAuthState.isLoggedIn) {
-        // Not logged in. Redirect to login if not already on splash/login
-        if (currentRoute != '/login' && currentRoute != '/splash') {
+        // Not logged in. Redirect to login if not already on splash/login/download-app
+        if (currentRoute != '/login' && currentRoute != '/splash' && currentRoute != '/download-app') {
           return '/login';
         }
         return null;
@@ -623,6 +624,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/download-app',
+        name: 'download_app',
+        builder: (context, state) => const DownloadAppScreen(),
       ),
       GoRoute(
         path: '/company-blocked',
