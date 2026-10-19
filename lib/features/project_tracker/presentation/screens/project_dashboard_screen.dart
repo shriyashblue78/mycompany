@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/erp_drawer.dart';
@@ -27,6 +28,12 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
   String _selectedDepartment = 'All';
   bool _isInitialized = false;
   String? _expandedProjectId;
+  String _currentView = 'overview'; // 'overview', 'expanded', 'details', 'department'
+  String _sidebarSelection = 'Project Tracker'; // 'Dashboard', 'Project Tracker', 'My Work', 'Team', 'Reports'
+  ProjectModel? _selectedProject;
+  String _activeDepartment = 'Marketing';
+  String _statusFilter = 'All';
+  String _departmentFilter = 'All';
 
   String _getProjectCode(ProjectModel project) {
     if (project.projectName.toLowerCase().contains('mission beta')) {
@@ -88,139 +95,1781 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
       final userDeptMapped = ProjectTrackerConfig.getStageNameFromDepartment(userDept);
       if (userDeptMapped.isNotEmpty) {
         _selectedDepartment = userDeptMapped;
+        _activeDepartment = userDeptMapped;
       } else {
         _selectedDepartment = 'All';
+        _activeDepartment = 'Marketing';
       }
       _isInitialized = true;
     }
 
     final projectsAsync = ref.watch(filteredProjectsProvider);
     final drawingsAsync = ref.watch(companyDrawingsStreamProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 850;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Project Tracker', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
-        backgroundColor: theme.colorScheme.surface,
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
-        actions: [
-          if (role == 'Owner')
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: ElevatedButton.icon(
-                onPressed: () => context.push('/project-tracker/create'),
-                icon: const Icon(Icons.add_rounded, color: Colors.white, size: 16),
-                label: const Text('Add Project', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-              ),
-            ),
-        ],
+    return Theme(
+      data: theme.copyWith(
+        textTheme: GoogleFonts.ibmPlexMonoTextTheme(theme.textTheme),
       ),
-      drawer: const ERPDrawer(),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSizes.p16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Stats Cards Header
-                _buildStatsHeader(theme, isDark),
-                const SizedBox(height: AppSizes.p12),
-
-                // 2. View Toggle Controls (Focus Area)
-                _buildViewSelector(user, role, theme, isDark),
-                const SizedBox(height: AppSizes.p12),
-
-                // 3. Search & Filter controls
-                _buildFilterControls(context, theme, isDark),
-                const SizedBox(height: AppSizes.p12),
-
-                // 4. Responsive List/Table
-                projectsAsync.when(
-                  loading: () => const Center(child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
-                  )),
-                  error: (err, stack) => Center(child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Text('Error loading projects: $err'),
-                  )),
-                  data: (projects) {
-                    final activeProjects = _selectedDepartment == 'All'
-                        ? projects
-                        : projects.where((p) => p.currentStage == _selectedDepartment && p.status != 'Completed' && p.status != 'On Hold').toList();
-
-                    if (activeProjects.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.assignment_late_outlined, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 12),
-                              Text(
-                                _selectedDepartment == 'All'
-                                    ? 'No projects found'
-                                    : 'No active projects currently at $_selectedDepartment stage',
-                                style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    final drawings = drawingsAsync.maybeWhen(
-                      data: (list) => list,
-                      orElse: () => <DrawingModel>[],
-                    );
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_selectedDepartment == 'All') ...[
-                          _buildWorkflowPipeline(projects, theme, isDark),
-                          const SizedBox(height: AppSizes.p12),
-                        ],
-                        ResponsiveLayout(
-                          mobile: _selectedDepartment == 'All'
-                              ? _buildMobileTable(context, activeProjects, user, theme, isDark)
-                              : _buildMobileDepartmentCards(context, activeProjects, drawings, user, theme, isDark),
-                          tablet: _selectedDepartment == 'All'
-                              ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
-                              : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
-                          desktop: _selectedDepartment == 'All'
-                              ? _buildDesktopTable(context, activeProjects, user, theme, isDark)
-                              : _buildDesktopDepartmentTable(context, activeProjects, drawings, user, theme, isDark),
-                        ),
-                        if (_selectedDepartment == 'All') ...[
-                          _buildPaginationRow(activeProjects.length, theme, isDark),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
+      child: Scaffold(
+        body: SafeArea(
+          child: _buildMainView(
+            context,
+            projectsAsync,
+            drawingsAsync,
+            user,
+            role,
+            theme,
+            isDark,
+            isDesktop,
           ),
         ),
       ),
-      floatingActionButton: role == 'Owner' && ResponsiveLayout.isMobile(context)
-          ? FloatingActionButton(
-              onPressed: () => context.push('/project-tracker/create'),
-              backgroundColor: theme.colorScheme.primary,
-              child: const Icon(Icons.add_rounded, color: Colors.white),
-            )
-          : null,
+    );
+  }
+
+
+
+  Widget _buildMainView(
+    BuildContext context,
+    AsyncValue<List<ProjectModel>> projectsAsync,
+    AsyncValue<List<DrawingModel>> drawingsAsync,
+    UserModel? user,
+    String role,
+    ThemeData theme,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    return projectsAsync.when(
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: CircularProgressIndicator(),
+      )),
+      error: (err, stack) => Center(child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Text('Error loading projects: $err'),
+      )),
+      data: (projects) {
+        final drawings = drawingsAsync.maybeWhen(
+          data: (list) => list,
+          orElse: () => <DrawingModel>[],
+        );
+
+        if (_currentView == 'expanded') {
+          return _buildExpandedListView(context, projects, user, role, theme, isDark, isDesktop);
+        } else if (_currentView == 'details' && _selectedProject != null) {
+          return _buildSimplifiedDetailsView(context, _selectedProject!, user, role, theme, isDark, isDesktop);
+        } else if (_currentView == 'department') {
+          return _buildDepartmentDetailsView(context, projects, drawings, user, role, theme, isDark, isDesktop);
+        } else {
+          return _buildOverviewView(context, projects, user, role, theme, isDark, isDesktop);
+        }
+      },
+    );
+  }
+
+  Widget _buildOverviewView(
+    BuildContext context,
+    List<ProjectModel> projects,
+    UserModel? user,
+    String role,
+    ThemeData theme,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSizes.p20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          if (!isDesktop) ...[
+            Row(
+              children: [
+                Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer())),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Project Tracker', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Track. Manage. Deliver.', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Expanded Project List View',
+                  icon: const Icon(Icons.table_rows_rounded, size: 20, color: Colors.grey),
+                  onPressed: () {
+                    setState(() {
+                      _currentView = 'expanded';
+                    });
+                  },
+                ),
+                if (role == 'Owner')
+                  IconButton(
+                    tooltip: 'Add Project',
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    ),
+                    onPressed: () => context.push('/project-tracker/create'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
+                decoration: const InputDecoration(
+                  hintText: 'Search projects...',
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                  prefixIcon: Icon(Icons.search_rounded, size: 16, color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Project Tracker', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text('Track. Manage. Deliver.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  ],
+                ),
+                const Spacer(),
+                // Search input
+                Container(
+                  width: 200,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: TextField(
+                    onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
+                    decoration: const InputDecoration(
+                      hintText: 'Search projects...',
+                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                      prefixIcon: Icon(Icons.search_rounded, size: 16, color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Bell icon
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_rounded, size: 20, color: Colors.grey),
+                  onPressed: () {},
+                ),
+                const SizedBox(width: 4),
+                // Toggle to expanded view
+                IconButton(
+                  tooltip: 'Expanded Project List View',
+                  icon: const Icon(Icons.table_rows_rounded, size: 20, color: Colors.grey),
+                  onPressed: () {
+                    setState(() {
+                      _currentView = 'expanded';
+                    });
+                  },
+                ),
+                if (role == 'Owner') ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => context.push('/project-tracker/create'),
+                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    label: const Text('Add Project', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          const SizedBox(height: 18),
+          // 4 Stat Cards
+          _buildReferenceStatCards(projects, theme, isDark, isDesktop),
+          const SizedBox(height: 16),
+          // Department Quick Cards row
+          _buildDepartmentQuickCards(projects, theme, isDark),
+          const SizedBox(height: 16),
+          // Left-side Middle Pagination
+          _buildPaginationRow(projects.length, theme, isDark),
+          const SizedBox(height: 12),
+          // Overview Table
+          _buildDesktopTable(context, projects, user, theme, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferenceStatCards(List<ProjectModel> projects, ThemeData theme, bool isDark, bool isDesktop) {
+    final total = projects.length;
+    final active = projects.where((p) => p.status == 'In Progress' || p.status == 'Active').length;
+    final now = DateTime.now();
+    bool isSameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+    final dueToday = projects.where((p) => p.endDate != null && isSameDay(p.endDate!, now)).length;
+    final blocked = projects.where((p) => p.status == 'On Hold' || p.status == 'Blocked' || p.status == 'Attention Required').length;
+
+    final cards = [
+      _buildStatCardItem('Total Projects', total.toString(), Icons.folder_rounded, const Color(0xFF3B82F6), theme, isDark),
+      _buildStatCardItem('Active', active.toString(), Icons.sync_rounded, const Color(0xFF10B981), theme, isDark),
+      _buildStatCardItem('Due Today', dueToday.toString(), Icons.calendar_today_rounded, const Color(0xFFF59E0B), theme, isDark),
+      _buildStatCardItem('Blocked', blocked.toString(), Icons.shield_outlined, const Color(0xFFEF4444), theme, isDark),
+    ];
+
+    if (!isDesktop) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              cards[0],
+              const SizedBox(width: 10),
+              cards[1],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              cards[2],
+              const SizedBox(width: 10),
+              cards[3],
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        cards[0],
+        const SizedBox(width: 12),
+        cards[1],
+        const SizedBox(width: 12),
+        cards[2],
+        const SizedBox(width: 12),
+        cards[3],
+      ],
+    );
+  }
+
+  Widget _buildStatCardItem(String label, String value, IconData icon, Color color, ThemeData theme, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? theme.colorScheme.surface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.1),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDepartmentQuickCards(List<ProjectModel> projects, ThemeData theme, bool isDark) {
+    final stages = ProjectTrackerConfig.stages;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: stages.map((dept) {
+          final deptColor = _getStageIconColor(dept);
+          final activeCount = projects.where((p) => p.currentStage.toLowerCase() == dept.toLowerCase() && p.status != 'Completed' && p.status != 'On Hold').length;
+          final completedCount = projects.where((p) => _getProjectStageObj(dept, p).status == 'Completed').length;
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _activeDepartment = dept;
+                  _currentView = 'department';
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 140,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(color: deptColor, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          dept,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$activeCount Active | $completedCount Done',
+                      style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildExpandedListView(
+    BuildContext context,
+    List<ProjectModel> projects,
+    UserModel? user,
+    String role,
+    ThemeData theme,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+
+    var filtered = projects;
+    if (_statusFilter != 'All') {
+      filtered = filtered.where((p) => p.status == _statusFilter).toList();
+    }
+    if (_departmentFilter != 'All') {
+      filtered = filtered.where((p) => p.currentStage == _departmentFilter).toList();
+    }
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSizes.p20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          if (!isDesktop) ...[
+            Row(
+              children: [
+                Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer())),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentView = 'overview';
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 20, color: theme.colorScheme.primary),
+                      Text('Back', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                if (role == 'Owner')
+                  IconButton(
+                    tooltip: 'Add Project',
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    ),
+                    onPressed: () => context.push('/project-tracker/create'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
+                decoration: const InputDecoration(
+                  hintText: 'Search projects...',
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                  prefixIcon: Icon(Icons.search_rounded, size: 16, color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentView = 'overview';
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 20, color: theme.colorScheme.primary),
+                      Text('Project Tracker', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                // Search field
+                Container(
+                  width: 220,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: TextField(
+                    onChanged: (val) => ref.read(projectSearchQueryProvider.notifier).state = val,
+                    decoration: const InputDecoration(
+                      hintText: 'Search projects...',
+                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                      prefixIcon: Icon(Icons.search_rounded, size: 16, color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_rounded, size: 20, color: Colors.grey),
+                  onPressed: () {},
+                ),
+                if (role == 'Owner') ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => context.push('/project-tracker/create'),
+                    icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                    label: const Text('Add Project', style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          // Filter Bar
+          if (!isDesktop) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _departmentFilter,
+                        items: ['All', ...ProjectTrackerConfig.stages]
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s == 'All' ? 'All Departments' : s, style: const TextStyle(fontSize: 12))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _departmentFilter = val);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _statusFilter,
+                        items: ['All', 'In Progress', 'Completed', 'Blocked', 'Planned']
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s == 'All' ? 'All Status' : s, style: const TextStyle(fontSize: 12))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _statusFilter = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  _buildLegendItem('Completed', Colors.green),
+                  const SizedBox(width: 12),
+                  _buildLegendItem('In Progress', Colors.orange),
+                  const SizedBox(width: 12),
+                  _buildLegendItem('Blocked', Colors.red),
+                  const SizedBox(width: 12),
+                  _buildLegendItem('Not Started', Colors.grey),
+                ],
+              ),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _departmentFilter,
+                      items: ['All', ...ProjectTrackerConfig.stages]
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s == 'All' ? 'All Departments' : s, style: const TextStyle(fontSize: 12))))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _departmentFilter = val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _statusFilter,
+                      items: ['All', 'In Progress', 'Completed', 'Blocked', 'Planned']
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s == 'All' ? 'All Status' : s, style: const TextStyle(fontSize: 12))))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _statusFilter = val);
+                      },
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    _buildLegendItem('Completed', Colors.green),
+                    const SizedBox(width: 12),
+                    _buildLegendItem('In Progress', Colors.orange),
+                    const SizedBox(width: 12),
+                    _buildLegendItem('Blocked', Colors.red),
+                    const SizedBox(width: 12),
+                    _buildLegendItem('Not Started', Colors.grey),
+                  ],
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          _buildExpandedProjectsTable(context, filtered, user, theme, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label, style: const TextStyle(fontSize: 11.5, color: Colors.grey, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildExpandedProjectsTable(BuildContext context, List<ProjectModel> projects, UserModel? user, ThemeData theme, bool isDark) {
+    final Color borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = constraints.maxWidth < 1100 ? 1100 : constraints.maxWidth;
+        final double srWidth = width * 0.04;
+        final double projWidth = width * 0.17;
+        final double stageWidth = width * 0.095;
+        final double statusWidth = width * 0.11;
+        final double actionsWidth = width * 0.04;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surface : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: IntrinsicWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+                    height: 48,
+                    child: Row(
+                      children: [
+                        _buildHeaderCell('#', srWidth, Colors.grey.shade700, borderColor),
+                        _buildHeaderCell('Project', projWidth, Colors.grey.shade700, borderColor),
+                        ...ProjectTrackerConfig.stages.map((stg) => _buildHeaderCell(stg, stageWidth, _getStageIconColor(stg), borderColor)),
+                        _buildHeaderCell('Status', statusWidth, Colors.grey.shade700, borderColor),
+                        _buildHeaderCell('Actions', actionsWidth, Colors.grey.shade700, borderColor, isLast: true),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, thickness: 1),
+                  ...projects.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final project = entry.value;
+                    final srNo = (idx + 1).toString().padLeft(2, '0');
+                    final completedCount = _getCompletedStagesCount(project);
+                    final percent = completedCount / 7.0;
+
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedProject = project;
+                          _currentView = 'details';
+                        });
+                      },
+                      hoverColor: theme.colorScheme.primary.withOpacity(0.04),
+                      child: Container(
+                        height: 64,
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildBodyCell(Text(srNo, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)), srWidth, borderColor),
+                            _buildBodyCell(
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(project.projectName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text('Created ${DateFormat('dd MMM yyyy').format(project.startDate)}', style: const TextStyle(color: Colors.grey, fontSize: 10.5)),
+                                ],
+                              ),
+                              projWidth,
+                              borderColor,
+                              alignment: Alignment.centerLeft,
+                              horizontalPadding: 8,
+                            ),
+                            ...ProjectTrackerConfig.stages.map((stg) {
+                              final stage = _getProjectStageObj(stg, project);
+                              final color = _getStatusColor(stage.status);
+                              final hasWork = stage.status != 'Pending';
+
+                              return _buildBodyCell(
+                                hasWork
+                                    ? Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            stage.status == 'Completed' ? 'Done' : 'Active',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                                          ),
+                                        ],
+                                      )
+                                    : const Text('-', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                stageWidth,
+                                borderColor,
+                              );
+                            }),
+                            _buildBodyCell(
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  _buildOverallStatusBadge(project.status, _getStatusColor(project.status)),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    width: 70,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: LinearProgressIndicator(
+                                        value: percent,
+                                        minHeight: 4,
+                                        backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                                        valueColor: AlwaysStoppedAnimation(Colors.green.shade600),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text('${(percent * 100).toInt()}%', style: const TextStyle(fontSize: 9.5, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              statusWidth,
+                              borderColor,
+                            ),
+                            _buildBodyCell(
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert_rounded, color: Colors.grey, size: 18),
+                                padding: EdgeInsets.zero,
+                                onSelected: (val) {
+                                  if (val == 'details') {
+                                    setState(() {
+                                      _selectedProject = project;
+                                      _currentView = 'details';
+                                    });
+                                  } else if (val == 'edit') {
+                                    context.push('/project-tracker/${project.projectId}/edit', extra: project);
+                                  } else if (val == 'delete') {
+                                    _confirmDelete(context, project, user);
+                                  }
+                                },
+                                itemBuilder: (ctx) => [
+                                  const PopupMenuItem(value: 'details', child: Text('Open Details')),
+                                  const PopupMenuItem(value: 'edit', child: Text('Edit Metadata')),
+                                  const PopupMenuItem(value: 'delete', child: Text('Delete Project', style: TextStyle(color: Colors.red))),
+                                ],
+                              ),
+                              actionsWidth,
+                              borderColor,
+                              isLast: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSimplifiedDetailsView(
+    BuildContext context,
+    ProjectModel project,
+    UserModel? user,
+    String role,
+    ThemeData theme,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final completedCount = _getCompletedStagesCount(project);
+    final percent = completedCount / 7.0;
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSizes.p20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          if (!isDesktop) ...[
+            Row(
+              children: [
+                Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer())),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentView = 'overview';
+                      _selectedProject = null;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 22, color: theme.colorScheme.primary),
+                      Text('Back', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    project.projectName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _buildOverallStatusBadge(project.status, _getStatusColor(project.status)),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded, color: Colors.grey, size: 20),
+                  padding: EdgeInsets.zero,
+                  onSelected: (val) {
+                    if (val == 'edit') {
+                      context.push('/project-tracker/${project.projectId}/edit', extra: project);
+                    } else if (val == 'delete') {
+                      _confirmDelete(context, project, user);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit Metadata')),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete Project', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 13, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(DateFormat('dd MMM yyyy').format(project.startDate), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 13, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      project.endDate != null ? DateFormat('dd MMM yyyy').format(project.endDate!) : 'No Due Date',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Client: ${_getClientName(project)}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 6),
+                      Container(width: 1, height: 10, color: Colors.grey.shade400),
+                      const SizedBox(width: 6),
+                      Text('Code: ${_getProjectCode(project)}', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: percent,
+                          minHeight: 6,
+                          backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation(Colors.green.shade600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('${(percent * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentView = 'overview';
+                      _selectedProject = null;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 22, color: theme.colorScheme.primary),
+                      Text('Project Tracker', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  project.projectName,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 10),
+                _buildOverallStatusBadge(project.status, _getStatusColor(project.status)),
+                const Spacer(),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded, color: Colors.grey, size: 20),
+                  onSelected: (val) {
+                    if (val == 'edit') {
+                      context.push('/project-tracker/${project.projectId}/edit', extra: project);
+                    } else if (val == 'delete') {
+                      _confirmDelete(context, project, user);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit Metadata')),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete Project', style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text('Created: ${DateFormat('dd MMM yyyy').format(project.startDate)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(width: 16),
+                const Icon(Icons.access_time_rounded, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  'Due: ${project.endDate != null ? DateFormat('dd MMM yyyy').format(project.endDate!) : 'Not Specified'}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Client: ${_getClientName(project)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(width: 1, height: 10, color: Colors.grey.shade400),
+                      const SizedBox(width: 8),
+                      Text('Code: ${_getProjectCode(project)}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: percent,
+                          minHeight: 8,
+                          backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation(Colors.green.shade600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${(percent * 100).toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 18),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: ProjectTrackerConfig.stages.map((stg) {
+                final stage = _getProjectStageObj(stg, project);
+                final colColor = _getStageIconColor(stg);
+                final isCurrent = project.currentStage.toLowerCase() == stg.toLowerCase();
+                final status = stage.status;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _activeDepartment = stg;
+                        _currentView = 'department';
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 140,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? (isDark ? colColor.withOpacity(0.12) : const Color(0xFFFFFBEB))
+                            : (isDark ? theme.colorScheme.surface : Colors.white),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isCurrent ? Colors.orange.shade300 : borderColor,
+                          width: isCurrent ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: colColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(_getStageIcon(stg), color: colColor, size: 16),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(stg, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            status == 'Completed' ? 'Completed' : (isCurrent ? 'In Progress' : 'Not Started'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: status == 'Completed' ? Colors.green : (isCurrent ? Colors.orange.shade800 : Colors.grey),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 750;
+              final currentTaskWidget = Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Current Task', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _getStageIconColor(project.currentStage).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(_getStageIcon(project.currentStage), color: _getStageIconColor(project.currentStage), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${project.currentStage} Task', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(project.currentStage, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Assigned to: ${_getProjectStageObj(project.currentStage, project).assignedUser ?? "Unassigned"}', style: const TextStyle(fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Text('Due: ${project.endDate != null ? DateFormat('dd MMM yyyy').format(project.endDate!) : "Ongoing"}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Latest Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getStageLatestRemarks(project.currentStage, project).isNotEmpty
+                                ? _getStageLatestRemarks(project.currentStage, project)
+                                : 'No remarks logged yet. Waiting for stage progress.',
+                            style: const TextStyle(fontSize: 12, height: 1.4),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            DateFormat('dd MMM yyyy - hh:mm a').format(_getStageReceivedTime(project.currentStage, project)),
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              final quickInfoWidget = Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Quick Info', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    _buildQuickInfoRow('Total Tasks', '7', Colors.blue),
+                    const Divider(height: 20),
+                    _buildQuickInfoRow('Completed', completedCount.toString(), Colors.green),
+                    const Divider(height: 20),
+                    _buildQuickInfoRow('In Progress', (7 - completedCount > 0 ? 1 : 0).toString(), Colors.orange),
+                    const Divider(height: 20),
+                    _buildQuickInfoRow('Blocked', (project.status == 'On Hold' || project.status == 'Blocked' ? 1 : 0).toString(), Colors.red),
+                  ],
+                ),
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    currentTaskWidget,
+                    const SizedBox(height: 16),
+                    quickInfoWidget,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 6, child: currentTaskWidget),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 4, child: quickInfoWidget),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          InkWell(
+            onTap: () => context.push('/project-tracker/${project.projectId}'),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey.shade900 : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.description_outlined, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text('View Full Project Details & History', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  const Spacer(),
+                  Icon(Icons.chevron_right_rounded, size: 18, color: theme.colorScheme.primary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickInfoRow(String label, String value, Color dotColor) {
+    return Row(
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        const Spacer(),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      ],
+    );
+  }
+
+  Widget _buildDepartmentDetailsView(
+    BuildContext context,
+    List<ProjectModel> projects,
+    List<DrawingModel> drawings,
+    UserModel? user,
+    String role,
+    ThemeData theme,
+    bool isDark,
+    bool isDesktop,
+  ) {
+    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final isManager = role == 'Owner' || role == 'HR' || role == 'Supervisor';
+    final userDeptMapped = ProjectTrackerConfig.getStageNameFromDepartment(user?.department ?? '');
+    final effectiveDept = isManager ? _activeDepartment : (userDeptMapped.isNotEmpty ? userDeptMapped : _activeDepartment);
+    final deptColor = _getStageIconColor(effectiveDept);
+
+    final allDeptTasks = <Map<String, dynamic>>[];
+    for (final p in projects) {
+      final stage = _getProjectStageObj(effectiveDept, p);
+      final receivedTime = _getStageReceivedTime(effectiveDept, p);
+      allDeptTasks.add({
+        'project': p,
+        'stage': stage,
+        'receivedTime': receivedTime,
+        'status': stage.status,
+        'assignedUser': stage.assignedUser ?? 'Unassigned',
+        'isCurrent': p.currentStage.toLowerCase() == effectiveDept.toLowerCase(),
+      });
+    }
+
+    final total = allDeptTasks.length;
+    final completed = allDeptTasks.where((t) => t['status'] == 'Completed').length;
+    final inProgress = allDeptTasks.where((t) => t['status'] == 'In Progress').length;
+    final pending = allDeptTasks.where((t) => t['status'] != 'Completed' && t['status'] != 'In Progress').length;
+    final remaining = total - completed;
+    final percent = total > 0 ? (completed / total.toDouble()) : 0.0;
+
+    final now = DateTime.now();
+    bool isSameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+    final todayCount = allDeptTasks.where((t) => isSameDay(t['receivedTime'] as DateTime, now)).length;
+
+    final assignedEmployee = allDeptTasks.firstWhere(
+      (t) => (t['assignedUser'] as String) != 'Unassigned',
+      orElse: () => {'assignedUser': user?.name ?? 'Employee'},
+    )['assignedUser'] as String;
+
+    final initials = assignedEmployee.trim().isNotEmpty
+        ? assignedEmployee.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+        : 'EM';
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSizes.p20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isDesktop) ...[
+            Row(
+              children: [
+                Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(ctx).openDrawer())),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (_selectedProject != null) {
+                        _currentView = 'details';
+                      } else {
+                        _currentView = 'overview';
+                        _sidebarSelection = 'Project Tracker';
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 20, color: theme.colorScheme.primary),
+                      Text('Back', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: deptColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(_getStageIcon(effectiveDept), color: deptColor, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    effectiveDept,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isManager) ...[
+                  Container(
+                    height: 30,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: effectiveDept,
+                        items: ProjectTrackerConfig.stages
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 11))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _activeDepartment = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ] else ...[
+            Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (_selectedProject != null) {
+                        _currentView = 'details';
+                      } else {
+                        _currentView = 'overview';
+                        _sidebarSelection = 'Project Tracker';
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 20, color: theme.colorScheme.primary),
+                      Text(_selectedProject != null ? _selectedProject!.projectName : 'Project Tracker', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: deptColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(_getStageIcon(effectiveDept), color: deptColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  effectiveDept,
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 10),
+                _buildOverallStatusBadge('In Progress', Colors.orange),
+                if (isManager) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: effectiveDept,
+                        items: ProjectTrackerConfig.stages
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _activeDepartment = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _currentView = 'overview';
+                      _sidebarSelection = 'Project Tracker';
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('View All Stages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            'Total Tasks: $total  |  Completed: $completed  |  In Progress: $inProgress  |  Pending: $pending',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 800;
+
+              final leftTasksSection = Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isDark ? theme.colorScheme.surface : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('Tasks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Spacer(),
+                        SizedBox(
+                          width: 100,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: percent,
+                              minHeight: 6,
+                              backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation(Colors.green.shade600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('$completed/$total', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    const Divider(height: 1),
+                    const SizedBox(height: 8),
+                    allDeptTasks.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Center(child: Text('No tasks recorded for this department.', style: TextStyle(color: Colors.grey))),
+                          )
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minWidth: isNarrow ? 620 : constraints.maxWidth - 50),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                    child: Row(
+                                      children: const [
+                                        SizedBox(width: 24, child: Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.grey))),
+                                        SizedBox(width: 14),
+                                        SizedBox(width: 180, child: Text('Task', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.grey))),
+                                        SizedBox(width: 130, child: Text('Assigned to', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.grey))),
+                                        SizedBox(width: 110, child: Text('Due Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.grey))),
+                                        SizedBox(width: 90, child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.grey), textAlign: TextAlign.center)),
+                                        SizedBox(width: 36),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(height: 1),
+                                  ...allDeptTasks.asMap().entries.map((entry) {
+                                    final idx = entry.key;
+                                    final item = entry.value;
+                                    final ProjectModel project = item['project'] as ProjectModel;
+                                    final ProjectStage stage = item['stage'] as ProjectStage;
+                                    final status = stage.status;
+                                    final statusColor = _getStatusColor(status);
+                                    final assignedUser = item['assignedUser'] as String;
+                                    final srNo = (idx + 1).toString().padLeft(2, '0');
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                                      decoration: BoxDecoration(
+                                        border: Border(bottom: BorderSide(color: borderColor.withOpacity(0.4), width: 0.5)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          SizedBox(width: 24, child: Text(srNo, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey))),
+                                          const SizedBox(width: 14),
+                                          SizedBox(
+                                            width: 180,
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '$effectiveDept - ${project.projectName}',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text('Code: ${_getProjectCode(project)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 130,
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(assignedUser, style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 110,
+                                            child: Text(
+                                              stage.completedAt != null
+                                                  ? DateFormat('dd MMM yyyy').format(stage.completedAt!)
+                                                  : DateFormat('dd MMM yyyy').format(item['receivedTime'] as DateTime),
+                                              style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 90,
+                                            child: Center(child: _buildOverallStatusBadge(status, statusColor)),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(Icons.edit_note_rounded, size: 18, color: Colors.blue),
+                                            onPressed: () => _openEditStageDialog(context, project, effectiveDept, stage),
+                                            tooltip: 'Update Status',
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ),
+                  ],
+                ),
+              );
+
+              final rightSidebarSection = Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: isDark ? theme.colorScheme.surface : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('Stage Progress', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 18),
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 86,
+                              height: 86,
+                              child: CircularProgressIndicator(
+                                value: percent,
+                                strokeWidth: 8,
+                                backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF10B981)),
+                              ),
+                            ),
+                            Text(
+                              '${(percent * 100).toInt()}%',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 19),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text('$completed/$total Completed', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        const SizedBox(height: 2),
+                        Text('$remaining Tasks Remaining', style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('$todayCount Due Today', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: isDark ? theme.colorScheme.surface : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Stage Owner', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.blue.shade900,
+                              child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5)),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(assignedEmployee, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                const SizedBox(height: 2),
+                                Text('$effectiveDept Lead', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: isDark ? theme.colorScheme.surface : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Quick Actions', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _currentView = 'overview';
+                              _sidebarSelection = 'Project Tracker';
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              Text('View All Tasks', style: TextStyle(fontSize: 12.5, color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              Icon(Icons.chevron_right_rounded, size: 18, color: theme.colorScheme.primary),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    leftTasksSection,
+                    const SizedBox(height: 16),
+                    rightSidebarSection,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 7, child: leftTasksSection),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 3, child: rightSidebarSection),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -588,187 +2237,194 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
         final double baseWidth = width < 1200 ? 1200 : width;
 
         final double srWidth = baseWidth * 0.04;
-        final double projWidth = baseWidth * 0.14;
-        final double clientWidth = baseWidth * 0.10;
-        final double stageWidth = baseWidth * 0.085;
+        final double projWidth = baseWidth * 0.17;
+        final double stageWidth = baseWidth * 0.095;
         final double statusWidth = baseWidth * 0.085;
-        final double actionsWidth = baseWidth * 0.045;
+        final double actionsWidth = baseWidth * 0.04;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? theme.colorScheme.surface : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            physics: const BouncingScrollPhysics(),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: IntrinsicWidth(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
-                      height: 52,
-                      child: Row(
-                        children: [
-                          _buildHeaderCell('Sr No.', srWidth, Colors.grey.shade700, borderColor),
-                          _buildHeaderCell('Project Name', projWidth, Colors.grey.shade700, borderColor),
-                          _buildHeaderCell('Client / Code', clientWidth, Colors.grey.shade700, borderColor),
-                          _buildHeaderCell('Marketing', stageWidth, _getStageIconColor('Marketing'), borderColor),
-                          _buildHeaderCell('Design', stageWidth, _getStageIconColor('Design'), borderColor),
-                          _buildHeaderCell('Purchase', stageWidth, _getStageIconColor('Purchase'), borderColor),
-                          _buildHeaderCell('Machining', stageWidth, _getStageIconColor('Machining'), borderColor),
-                          _buildHeaderCell('Assembly', stageWidth, _getStageIconColor('Assembly'), borderColor),
-                          _buildHeaderCell('Quality', stageWidth, _getStageIconColor('Quality'), borderColor),
-                          _buildHeaderCell('Accounts', stageWidth, _getStageIconColor('Accounts'), borderColor),
-                          _buildHeaderCell('Status', statusWidth, Colors.grey.shade700, borderColor),
-                          _buildHeaderCell('Actions', actionsWidth, Colors.grey.shade700, borderColor, isLast: true),
-                        ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? theme.colorScheme.surface : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: IntrinsicWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // STICKY LOCKED HEADER ROW
+                      Container(
+                        color: isDark ? Colors.grey.shade900 : const Color(0xFFF8FAFC),
+                        height: 52,
+                        child: Row(
+                          children: [
+                            _buildHeaderCell('#', srWidth, Colors.grey.shade700, borderColor),
+                            _buildHeaderCell('Project', projWidth, Colors.grey.shade700, borderColor, alignment: Alignment.centerLeft, horizontalPadding: 12),
+                            _buildDepartmentHeaderCell('Marketing', stageWidth, _getStageIconColor('Marketing'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Design', stageWidth, _getStageIconColor('Design'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Purchase', stageWidth, _getStageIconColor('Purchase'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Machining', stageWidth, _getStageIconColor('Machining'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Assembly', stageWidth, _getStageIconColor('Assembly'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Quality', stageWidth, _getStageIconColor('Quality'), borderColor, projects),
+                            _buildDepartmentHeaderCell('Accounts', stageWidth, _getStageIconColor('Accounts'), borderColor, projects),
+                            _buildHeaderCell('Status', statusWidth, Colors.grey.shade700, borderColor),
+                            _buildHeaderCell('Actions', actionsWidth, Colors.grey.shade700, borderColor, isLast: true),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Divider(height: 1, thickness: 1),
-                    ...projects.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final project = entry.value;
-                      final srNo = (idx + 1).toString().padLeft(2, '0');
-                      final role = ref.read(authProvider).selectedRole;
-                      final isAuthorized = role == 'Owner' || role == 'HR' || role == 'Supervisor';
+                      const Divider(height: 1, thickness: 1),
+                      // SCROLLABLE PROJECT ROWS (Locked Header remains visible above)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: (projects.length * 68.0).clamp(100.0, 520.0),
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: projects.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final project = entry.value;
+                              final srNo = (idx + 1).toString().padLeft(2, '0');
+                              final role = ref.read(authProvider).selectedRole;
+                              final isAuthorized = role == 'Owner' || role == 'HR' || role == 'Supervisor';
 
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                if (_expandedProjectId == project.projectId) {
-                                  _expandedProjectId = null;
-                                } else {
-                                  _expandedProjectId = project.projectId;
-                                }
-                              });
-                            },
-                            hoverColor: theme.colorScheme.primary.withOpacity(0.04),
-                            child: Container(
-                              height: 68,
-                              decoration: BoxDecoration(
-                                border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
-                              ),
-                              child: Row(
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _buildBodyCell(Text(srNo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), srWidth, borderColor),
-                                  _buildBodyCell(
-                                    Text(
-                                      project.projectName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    projWidth,
-                                    borderColor,
-                                    alignment: Alignment.centerLeft,
-                                    horizontalPadding: 8,
-                                  ),
-                                  _buildBodyCell(
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(_getClientName(project), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        Text(_getProjectCode(project), style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                      ],
-                                    ),
-                                    clientWidth,
-                                    borderColor,
-                                    alignment: Alignment.centerLeft,
-                                    horizontalPadding: 8,
-                                  ),
-                                  _buildBodyCell(_buildDesktopStageCell(project.marketingStage, 'Marketing', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.designStage, 'Design', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.purchaseStage, 'Purchase', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.machiningStage, 'Machining', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.assemblyStage, 'Assembly', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.qualityStage, 'Quality', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildDesktopStageCell(project.accountsStage, 'Accounts', project, theme, isDark), stageWidth, borderColor),
-                                  _buildBodyCell(_buildOverallStatusBadge(project.status, _getStatusColor(project.status)), statusWidth, borderColor),
-                                  _buildBodyCell(
-                                    GestureDetector(
-                                      onTap: () {},
-                                      child: PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert_rounded, color: Colors.grey, size: 20),
-                                        padding: EdgeInsets.zero,
-                                        onSelected: (val) {
-                                          if (val == 'details') {
-                                            context.push('/project-tracker/${project.projectId}');
-                                          } else if (val == 'edit') {
-                                            context.push('/project-tracker/${project.projectId}/edit', extra: project);
-                                          } else if (val == 'delete') {
-                                            _confirmDelete(context, project, user);
-                                          }
-                                        },
-                                        itemBuilder: (ctx) => [
-                                          const PopupMenuItem(
-                                            value: 'details',
-                                            child: Row(
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedProject = project;
+                                        _currentView = 'details';
+                                      });
+                                    },
+                                    hoverColor: theme.colorScheme.primary.withOpacity(0.04),
+                                    child: Container(
+                                      height: 68,
+                                      decoration: BoxDecoration(
+                                        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          _buildBodyCell(Text(srNo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), srWidth, borderColor),
+                                          _buildBodyCell(
+                                            Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Icon(Icons.unfold_more_rounded, size: 18),
-                                                SizedBox(width: 8),
-                                                Text('View Details'),
+                                                Text(
+                                                  project.projectName,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  'Created ${DateFormat('dd MMM yyyy').format(project.startDate)}',
+                                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 10.5),
+                                                ),
                                               ],
                                             ),
+                                            projWidth,
+                                            borderColor,
+                                            alignment: Alignment.centerLeft,
+                                            horizontalPadding: 12,
                                           ),
-                                          if (isAuthorized) ...[
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.edit_rounded, size: 18, color: Colors.blue),
-                                                  SizedBox(width: 8),
-                                                  Text('Edit Metadata'),
+                                          _buildBodyCell(_buildDesktopStageCell(project.marketingStage, 'Marketing', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.designStage, 'Design', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.purchaseStage, 'Purchase', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.machiningStage, 'Machining', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.assemblyStage, 'Assembly', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.qualityStage, 'Quality', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildDesktopStageCell(project.accountsStage, 'Accounts', project, theme, isDark), stageWidth, borderColor),
+                                          _buildBodyCell(_buildOverallStatusBadge(project.status, _getStatusColor(project.status)), statusWidth, borderColor),
+                                          _buildBodyCell(
+                                            GestureDetector(
+                                              onTap: () {},
+                                              child: PopupMenuButton<String>(
+                                                icon: const Icon(Icons.more_vert_rounded, color: Colors.grey, size: 20),
+                                                padding: EdgeInsets.zero,
+                                                onSelected: (val) {
+                                                  if (val == 'details') {
+                                                    context.push('/project-tracker/${project.projectId}');
+                                                  } else if (val == 'edit') {
+                                                    context.push('/project-tracker/${project.projectId}/edit', extra: project);
+                                                  } else if (val == 'delete') {
+                                                    _confirmDelete(context, project, user);
+                                                  }
+                                                },
+                                                itemBuilder: (ctx) => [
+                                                  const PopupMenuItem(
+                                                    value: 'details',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.unfold_more_rounded, size: 18),
+                                                        SizedBox(width: 8),
+                                                        Text('View Details'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  if (isAuthorized) ...[
+                                                    const PopupMenuItem(
+                                                      value: 'edit',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.edit_rounded, size: 18, color: Colors.blue),
+                                                          SizedBox(width: 8),
+                                                          Text('Edit Metadata'),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const PopupMenuItem(
+                                                      value: 'delete',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.delete_rounded, size: 18, color: Colors.red),
+                                                          SizedBox(width: 8),
+                                                          Text('Delete Project'),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
                                             ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete_rounded, size: 18, color: Colors.red),
-                                                  SizedBox(width: 8),
-                                                  Text('Delete Project'),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
+                                            actionsWidth,
+                                            borderColor,
+                                            isLast: true,
+                                          ),
                                         ],
                                       ),
                                     ),
-                                    actionsWidth,
-                                    borderColor,
-                                    isLast: true,
+                                  ),
+                                  AnimatedSize(
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeInOut,
+                                    child: _expandedProjectId == project.projectId
+                                        ? _buildExpandedDetails(context, project, theme, isDark)
+                                        : const SizedBox.shrink(),
                                   ),
                                 ],
-                              ),
-                            ),
+                              );
+                            }).toList(),
                           ),
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            child: _expandedProjectId == project.projectId
-                                ? _buildExpandedDetails(context, project, theme, isDark)
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -787,6 +2443,49 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Client / Code info corner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade800.withOpacity(0.5) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.business_rounded, size: 16, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Client: ',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      _getClientName(project),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(width: 1, height: 14, color: Colors.grey.shade400),
+                    const SizedBox(width: 16),
+                    const Icon(Icons.tag_rounded, size: 16, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Code: ',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      _getProjectCode(project),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -935,7 +2634,7 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
     );
   }
 
-  Widget _buildHeaderCell(String text, double width, Color textColor, Color borderColor, {bool isLast = false}) {
+  Widget _buildDepartmentHeaderCell(String text, double width, Color textColor, Color borderColor, List<ProjectModel> projects, {bool isLast = false}) {
     return Container(
       width: width,
       height: 52,
@@ -945,10 +2644,444 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
           right: isLast ? BorderSide.none : BorderSide(color: borderColor, width: 0.5),
         ),
       ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _activeDepartment = text;
+                _currentView = 'department';
+              });
+            },
+            child: Text(
+              text,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12.5,
+                color: textColor,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 3),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _activeDepartment = text;
+                _currentView = 'department';
+              });
+            },
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: textColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: textColor.withOpacity(0.3), width: 0.5),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.person_pin_rounded, size: 9, color: textColor),
+                  const SizedBox(width: 2),
+                  Text(
+                    'My Work',
+                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: textColor),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMyWorkModal(BuildContext context, String department, List<ProjectModel> projects) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final deptColor = _getStageIconColor(department);
+
+    // Extract task items for this department across projects
+    final allDeptTasks = <Map<String, dynamic>>[];
+    for (final p in projects) {
+      final stage = _getProjectStageObj(department, p);
+      final receivedTime = _getStageReceivedTime(department, p);
+      allDeptTasks.add({
+        'project': p,
+        'stage': stage,
+        'receivedTime': receivedTime,
+        'status': stage.status,
+        'assignedUser': stage.assignedUser ?? 'Unassigned',
+        'isCurrent': p.currentStage.toLowerCase() == department.toLowerCase(),
+      });
+    }
+
+    final today = DateTime.now();
+    bool isSameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+
+    final todayTasks = allDeptTasks.where((t) {
+      final dt = t['receivedTime'] as DateTime;
+      return isSameDay(dt, today);
+    }).toList();
+
+    final completedTasks = allDeptTasks.where((t) => t['status'] == 'Completed').toList();
+    final pendingTasks = allDeptTasks.where((t) => t['status'] != 'Completed').toList();
+    final currentTasks = allDeptTasks.where((t) => t['isCurrent'] == true && t['status'] != 'Completed').toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: LayoutBuilder(
+          builder: (context, modalConstraints) {
+            final isMobileModal = modalConstraints.maxWidth < 600;
+
+            return Container(
+              width: 720,
+              constraints: const BoxConstraints(maxHeight: 640),
+              padding: EdgeInsets.all(isMobileModal ? 14 : 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: deptColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(_getStageIcon(department), color: deptColor, size: isMobileModal ? 18 : 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$department — My Work',
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: isMobileModal ? 14 : 16),
+                            ),
+                            Text(
+                              'Tasks & stage progress for $department',
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Compact summary row
+                  if (isMobileModal) ...[
+                    Row(
+                      children: [
+                        _buildMyWorkSummaryChip('Today', todayTasks.length.toString(), Colors.blue),
+                        const SizedBox(width: 6),
+                        _buildMyWorkSummaryChip('Active', currentTasks.length.toString(), Colors.orange),
+                        const SizedBox(width: 6),
+                        _buildMyWorkSummaryChip('Pending', pendingTasks.length.toString(), Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        _buildMyWorkSummaryChip('Done', completedTasks.length.toString(), Colors.green),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        _buildMyWorkSummaryChip('Today\'s Tasks', todayTasks.length.toString(), Colors.blue),
+                        const SizedBox(width: 8),
+                        _buildMyWorkSummaryChip('Current Active', currentTasks.length.toString(), Colors.orange),
+                        const SizedBox(width: 8),
+                        _buildMyWorkSummaryChip('Pending', pendingTasks.length.toString(), Colors.grey.shade700),
+                        const SizedBox(width: 8),
+                        _buildMyWorkSummaryChip('Completed', completedTasks.length.toString(), Colors.green),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+                  // Task list
+                  Expanded(
+                    child: allDeptTasks.isEmpty
+                        ? const Center(
+                            child: Text('No tasks found for this department.', style: TextStyle(color: Colors.grey)),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: allDeptTasks.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (context, idx) {
+                              final item = allDeptTasks[idx];
+                              final ProjectModel project = item['project'] as ProjectModel;
+                              final ProjectStage stage = item['stage'] as ProjectStage;
+                              final status = stage.status;
+                              final assignedUser = item['assignedUser'] as String;
+                              final isCurrent = item['isCurrent'] as bool;
+                              final statusColor = _getStatusColor(status);
+
+                              if (isMobileModal) {
+                                return Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isCurrent
+                                          ? deptColor.withOpacity(0.5)
+                                          : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                                      width: isCurrent ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          if (isCurrent)
+                                            Container(
+                                              margin: const EdgeInsets.only(right: 6),
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withOpacity(0.15),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Text('Current', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.orange)),
+                                            ),
+                                          Expanded(
+                                            child: Text(
+                                              project.projectName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: statusColor, width: 0.8),
+                                            ),
+                                            child: Text(
+                                              status,
+                                              style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Text('Code: ${_getProjectCode(project)}', style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
+                                          const Spacer(),
+                                          const Icon(Icons.person_outline_rounded, size: 12, color: Colors.grey),
+                                          const SizedBox(width: 3),
+                                          Text(assignedUser, style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            stage.completedAt != null
+                                                ? 'Done: ${DateFormat('dd/MM').format(stage.completedAt!)}'
+                                                : 'Recv: ${DateFormat('dd/MM').format(item['receivedTime'] as DateTime)}',
+                                            style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isCurrent
+                                        ? deptColor.withOpacity(0.5)
+                                        : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                                    width: isCurrent ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    if (isCurrent)
+                                      Container(
+                                        margin: const EdgeInsets.only(right: 10),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'Current Task',
+                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.orange),
+                                        ),
+                                      ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            project.projectName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Code: ${_getProjectCode(project)}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              assignedUser,
+                                              style: const TextStyle(fontSize: 12),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        stage.completedAt != null
+                                            ? 'Done: ${DateFormat('dd/MM/yy').format(stage.completedAt!)}'
+                                            : 'Recv: ${DateFormat('dd/MM/yy').format(item['receivedTime'] as DateTime)}',
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: statusColor, width: 1),
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationRow(int totalProjects, ThemeData theme, bool isDark) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+          ),
+          child: Text(
+            'Showing 1-$totalProjects of $totalProjects',
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.grey),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded, size: 18),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          onPressed: null,
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text('1', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded, size: 18),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          onPressed: null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMyWorkSummaryChip(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell(String text, double width, Color textColor, Color borderColor,
+      {bool isLast = false, Alignment alignment = Alignment.center, double horizontalPadding = 0}) {
+    return Container(
+      width: width,
+      height: 52,
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      alignment: alignment,
+      decoration: BoxDecoration(
+        border: Border(
+          right: isLast ? BorderSide.none : BorderSide(color: borderColor, width: 0.5),
+        ),
+      ),
       child: Text(
         text,
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textColor),
-        textAlign: TextAlign.center,
+        textAlign: alignment == Alignment.centerLeft ? TextAlign.left : TextAlign.center,
       ),
     );
   }
@@ -970,100 +3103,77 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
   }
 
   Widget _buildDesktopStageCell(ProjectStage stage, String stageName, ProjectModel project, ThemeData theme, bool isDark) {
-    final isCurrent = project.currentStage == stageName;
-    final colColor = _getStageIconColor(stageName);
-
     return Container(
       width: double.infinity,
       height: double.infinity,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: isCurrent ? colColor.withOpacity(0.04) : Colors.transparent,
-        border: isCurrent ? Border.all(color: colColor.withOpacity(0.4), width: 1) : null,
-      ),
-      child: _buildStageStatusView(stage, stageName, isDark),
+      child: _buildStageStatusView(stage, stageName, project, isDark),
     );
   }
 
-  Widget _buildStageStatusView(ProjectStage stage, String stageName, bool isDark) {
-    if (stage.status == 'Completed') {
-      final dateStr = stage.completedAt != null ? DateFormat('dd/MM').format(stage.completedAt!) : '';
-      return Column(
+  Widget _buildStageStatusView(ProjectStage stage, String stageName, ProjectModel project, bool isDark) {
+    final bool isCompleted = stage.status == 'Completed';
+    final bool isInProgress = stage.status == 'In Progress' || project.currentStage.toLowerCase() == stageName.toLowerCase();
+    final Color dotColor = _getStatusColor(stage.status);
+    final String remarks = _getStageLatestRemarks(stageName, project);
+    final String taskLabel = remarks.isNotEmpty
+        ? remarks
+        : (isCompleted
+            ? (stage.completedAt != null ? DateFormat('dd/MM').format(stage.completedAt!) : 'Completed')
+            : stage.status);
+    final String assignee = (stage.assignedUser != null && stage.assignedUser!.isNotEmpty)
+        ? stage.assignedUser!
+        : '-';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+              if (isCompleted)
+                const Icon(Icons.check_circle_rounded, color: Colors.green, size: 14)
+              else if (isInProgress)
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                )
+              else
+                Icon(Icons.access_time_rounded, color: Colors.grey.shade400, size: 13),
               const SizedBox(width: 4),
-              Text(
-                dateStr,
-                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12.5),
+              Expanded(
+                child: Text(
+                  taskLabel,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                    color: isCompleted
+                        ? Colors.green
+                        : (isInProgress ? (dotColor == Colors.grey ? Colors.orange.shade700 : dotColor) : Colors.grey.shade600),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 2),
-          Text(
-            stage.assignedUser ?? 'Unassigned',
-            style: const TextStyle(color: Colors.grey, fontSize: 11),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Padding(
+            padding: const EdgeInsets.only(left: 11),
+            child: Text(
+              assignee,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 10.5),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
-      );
-    } else if (stage.status == 'In Progress') {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.access_time_filled_rounded, color: Colors.orange.shade700, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                'In Progress',
-                style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.bold, fontSize: 12.5),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            stage.assignedUser ?? '-',
-            style: const TextStyle(color: Colors.grey, fontSize: 11),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.access_time_rounded, color: Colors.grey, size: 16),
-              SizedBox(width: 4),
-              Text(
-                'Pending',
-                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12.5),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            '-',
-            style: TextStyle(color: Colors.grey, fontSize: 11),
-          ),
-        ],
-      );
-    }
+      ),
+    );
   }
 
   Widget _buildOverallStatusBadge(String status, Color color) {
@@ -1534,59 +3644,6 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
     );
   }
 
-  Widget _buildPaginationRow(int totalCount, ThemeData theme, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        children: [
-          Text(
-            'Showing $totalCount of $totalCount projects',
-            style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                onPressed: null,
-                style: IconButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(32, 32),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.primary),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '1',
-                  style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                onPressed: null,
-                style: IconButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(32, 32),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
   void _openEditStageDialog(BuildContext context, ProjectModel project, String departmentName, ProjectStage stage) {
     showDialog(
       context: context,
@@ -1615,14 +3672,21 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Planned':
-        return Colors.purple;
-      case 'In Progress':
-        return Colors.orange;
       case 'Completed':
+      case 'Finished':
         return Colors.green;
+      case 'In Progress':
+      case 'Active':
+        return Colors.orange;
       case 'On Hold':
+      case 'Blocked':
+      case 'Delayed':
+      case 'Attention Required':
+      case 'Rejected':
         return Colors.red;
+      case 'Planned':
+      case 'Not Started':
+      case 'Pending':
       default:
         return Colors.grey;
     }

@@ -20,4 +20,8 @@ class FilePickerHelper {
   static Future<PickedFileResult?> pickFile() {
     return impl.pickFileImpl();
   }
+
+  static Future<List<PickedFileResult>> pickMultipleFiles({List<String>? allowedExtensions}) {
+    return impl.pickMultipleFilesImpl(allowedExtensions: allowedExtensions);
+  }
 }

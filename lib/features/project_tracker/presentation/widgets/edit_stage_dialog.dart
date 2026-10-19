@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/project_model.dart';
 import '../providers/project_tracker_provider.dart';
@@ -151,7 +152,11 @@ class _EditStageDialogState extends ConsumerState<EditStageDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return AlertDialog(
+    return Theme(
+      data: theme.copyWith(
+        textTheme: GoogleFonts.ibmPlexMonoTextTheme(theme.textTheme),
+      ),
+      child: AlertDialog(
       title: Text('Edit ${widget.departmentName} Stage'),
       content: _saving
           ? const SizedBox(
@@ -273,6 +278,7 @@ class _EditStageDialogState extends ConsumerState<EditStageDialog> {
           ),
         ],
       ],
+      ),
     );
   }
 }

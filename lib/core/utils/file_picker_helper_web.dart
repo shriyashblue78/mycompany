@@ -52,3 +52,58 @@ Future<PickedFileResult?> pickFileImpl() async {
 
   return completer.future;
 }
+
+Future<List<PickedFileResult>> pickMultipleFilesImpl({List<String>? allowedExtensions}) async {
+  final completer = Completer<List<PickedFileResult>>();
+  final uploadInput = html.InputElement(type: 'file');
+  uploadInput.multiple = true;
+  if (allowedExtensions != null && allowedExtensions.isNotEmpty) {
+    uploadInput.accept = allowedExtensions.map((e) => e.startsWith('.') ? e : '.$e').join(',');
+  } else {
+    uploadInput.accept = '.pdf,.png,.jpg,.jpeg';
+  }
+  uploadInput.style.display = 'none';
+  html.document.body?.append(uploadInput);
+
+  uploadInput.click();
+
+  uploadInput.onChange.listen((e) async {
+    final files = uploadInput.files;
+    if (files != null && files.isNotEmpty) {
+      final list = <PickedFileResult>[];
+      for (final file in files) {
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+        final bytes = reader.result as Uint8List;
+        final name = file.name;
+        final dotIndex = name.lastIndexOf('.');
+        final ext = dotIndex != -1 ? name.substring(dotIndex + 1).toLowerCase() : '';
+        list.add(PickedFileResult(
+          name: name,
+          extension: ext,
+          size: file.size ?? bytes.length,
+          bytes: bytes,
+        ));
+      }
+      completer.complete(list);
+      uploadInput.remove();
+    } else {
+      completer.complete([]);
+      uploadInput.remove();
+    }
+  });
+
+  late StreamSubscription focusSub;
+  focusSub = html.window.onFocus.listen((event) {
+    focusSub.cancel();
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!completer.isCompleted) {
+        completer.complete([]);
+        uploadInput.remove();
+      }
+    });
+  });
+
+  return completer.future;
+}

@@ -20,3 +20,27 @@ Future<PickedFileResult?> pickFileImpl() async {
   }
   return null;
 }
+
+Future<List<PickedFileResult>> pickMultipleFilesImpl({List<String>? allowedExtensions}) async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: allowedExtensions ?? ['pdf', 'png', 'jpg', 'jpeg'],
+    allowMultiple: true,
+    withData: true,
+  );
+  if (result != null && result.files.isNotEmpty) {
+    final list = <PickedFileResult>[];
+    for (final file in result.files) {
+      if (file.bytes != null) {
+        list.add(PickedFileResult(
+          name: file.name,
+          extension: file.extension?.toLowerCase() ?? '',
+          size: file.size,
+          bytes: file.bytes!,
+        ));
+      }
+    }
+    return list;
+  }
+  return [];
+}

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/widgets/responsive_layout.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -19,6 +20,20 @@ class ProjectDetailScreen extends ConsumerWidget {
     super.key,
     required this.projectId,
   });
+
+  String _getProjectCode(ProjectModel project) {
+    if (project.projectName.toLowerCase().contains('mission beta')) {
+      return 'MB-2025-001';
+    }
+    return 'PRJ-${project.projectId.toUpperCase().substring(0, 5)}';
+  }
+
+  String _getClientName(ProjectModel project) {
+    if (project.projectName.toLowerCase().contains('mission beta')) {
+      return 'John Doe';
+    }
+    return 'Internal';
+  }
 
   Color _getStageColor(String name) {
     switch (name) {
@@ -96,65 +111,70 @@ class ProjectDetailScreen extends ConsumerWidget {
 
     final projectAsync = ref.watch(projectDetailsStreamProvider(projectId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Project Details'),
-        elevation: 0,
-        backgroundColor: theme.colorScheme.surface,
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
-        actions: [
-          if (role == 'Owner' || role == 'HR' || role == 'Supervisor')
-            projectAsync.when(
-              data: (project) => project != null
-                  ? Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_rounded, color: Colors.blue),
-                          tooltip: 'Edit Project Metadata',
-                          onPressed: () => context.push('/project-tracker/$projectId/edit', extra: project),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                          tooltip: 'Delete Project',
-                          onPressed: () => _confirmDelete(context, ref, project, user),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
-        ],
+    return Theme(
+      data: theme.copyWith(
+        textTheme: GoogleFonts.ibmPlexMonoTextTheme(theme.textTheme),
       ),
-      body: projectAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error loading details: $err')),
-        data: (project) {
-          if (project == null) {
-            return const Center(child: Text('Project details not found.'));
-          }
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Project Details'),
+          elevation: 0,
+          backgroundColor: theme.colorScheme.surface,
+          iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+          actions: [
+            if (role == 'Owner' || role == 'HR' || role == 'Supervisor')
+              projectAsync.when(
+                data: (project) => project != null
+                    ? Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_rounded, color: Colors.blue),
+                            tooltip: 'Edit Project Metadata',
+                            onPressed: () => context.push('/project-tracker/$projectId/edit', extra: project),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                            tooltip: 'Delete Project',
+                            onPressed: () => _confirmDelete(context, ref, project, user),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+          ],
+        ),
+        body: projectAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Center(child: Text('Error loading details: $err')),
+          data: (project) {
+            if (project == null) {
+              return const Center(child: Text('Project details not found.'));
+            }
 
-          if (user == null) {
-            return const Center(child: Text('No authenticated user session.'));
-          }
+            if (user == null) {
+              return const Center(child: Text('No authenticated user session.'));
+            }
 
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSizes.p20),
-              child: Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: ResponsiveLayout(
-                    mobile: _buildMobileLayout(context, ref, project, user, theme, isDark),
-                    tablet: _buildDesktopLayout(context, ref, project, user, theme, isDark),
-                    desktop: _buildDesktopLayout(context, ref, project, user, theme, isDark),
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSizes.p20),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: ResponsiveLayout(
+                      mobile: _buildMobileLayout(context, ref, project, user, theme, isDark),
+                      tablet: _buildDesktopLayout(context, ref, project, user, theme, isDark),
+                      desktop: _buildDesktopLayout(context, ref, project, user, theme, isDark),
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -243,7 +263,33 @@ class ProjectDetailScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const Divider(height: 32),
+            const SizedBox(height: 10),
+            // Client / Code Corner Section
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey.shade900 : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.business_rounded, size: 15, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Text('Client: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+                  Text(_getClientName(project), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 14),
+                  Container(width: 1, height: 12, color: Colors.grey.shade400),
+                  const SizedBox(width: 14),
+                  const Icon(Icons.tag_rounded, size: 15, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text('Code: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+                  Text(_getProjectCode(project), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                ],
+              ),
+            ),
+            const Divider(height: 28),
             Text(
               'Description',
               style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold),
@@ -644,14 +690,21 @@ class ProjectDetailScreen extends ConsumerWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'Planned':
-        return Colors.purple;
-      case 'In Progress':
-        return Colors.orange;
       case 'Completed':
+      case 'Finished':
         return Colors.green;
+      case 'In Progress':
+      case 'Active':
+        return Colors.orange;
       case 'On Hold':
+      case 'Blocked':
+      case 'Delayed':
+      case 'Attention Required':
+      case 'Rejected':
         return Colors.red;
+      case 'Planned':
+      case 'Not Started':
+      case 'Pending':
       default:
         return Colors.grey;
     }

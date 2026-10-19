@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -174,173 +175,178 @@ class _ProjectFormScreenState extends ConsumerState<ProjectFormScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditMode ? 'Edit Project' : 'Create New Project'),
-        elevation: 0,
-        backgroundColor: theme.colorScheme.surface,
-        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+    return Theme(
+      data: theme.copyWith(
+        textTheme: GoogleFonts.ibmPlexMonoTextTheme(theme.textTheme),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 700),
-                padding: const EdgeInsets.all(AppSizes.p24),
-                child: SingleChildScrollView(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_errorMessage != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.errorContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error_outline_rounded, color: theme.colorScheme.error),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: TextStyle(color: theme.colorScheme.onErrorContainer),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isEditMode ? 'Edit Project' : 'Create New Project'),
+          elevation: 0,
+          backgroundColor: theme.colorScheme.surface,
+          iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 700),
+                  padding: const EdgeInsets.all(AppSizes.p24),
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_errorMessage != null) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded, color: theme.colorScheme.error),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Project Name
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Project Name *',
+                              prefixIcon: const Icon(Icons.folder_rounded),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) return 'Project name is required';
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
+
+                          // Description
+                          TextFormField(
+                            controller: _descriptionController,
+                            maxLines: 4,
+                            decoration: InputDecoration(
+                              labelText: 'Project Description *',
+                              prefixIcon: const Icon(Icons.description_rounded),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) return 'Project description is required';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Status Dropdown
+                          DropdownButtonFormField<String>(
+                            value: _selectedStatus,
+                            decoration: InputDecoration(
+                              labelText: 'Status',
+                              prefixIcon: const Icon(Icons.info_outline_rounded),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            items: <String>['Planned', 'In Progress', 'Completed', 'On Hold']
+                                .map((status) => DropdownMenuItem<String>(
+                                      value: status,
+                                      child: Text(status),
+                                    ))
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedStatus = val;
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Date Pickers
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _selectStartDate(context),
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: 'Start Date *',
+                                      prefixIcon: const Icon(Icons.calendar_today_rounded),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    child: Text(DateFormat('MMM d, yyyy').format(_startDate)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _selectEndDate(context),
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: 'End Date (Optional)',
+                                      prefixIcon: const Icon(Icons.calendar_month_rounded),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    child: Text(_endDate != null ? DateFormat('MMM d, yyyy').format(_endDate!) : 'Not Set'),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+
+                          // Action Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => context.pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _saveForm,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: theme.colorScheme.primary,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: Text(
+                                    _isEditMode ? 'Save Changes' : 'Create Project',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
-
-                        // Project Name
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: 'Project Name *',
-                            prefixIcon: const Icon(Icons.folder_rounded),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Project name is required';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Description
-                        TextFormField(
-                          controller: _descriptionController,
-                          maxLines: 4,
-                          decoration: InputDecoration(
-                            labelText: 'Project Description *',
-                            prefixIcon: const Icon(Icons.description_rounded),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Project description is required';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Status Dropdown
-                        DropdownButtonFormField<String>(
-                          value: _selectedStatus,
-                          decoration: InputDecoration(
-                            labelText: 'Status',
-                            prefixIcon: const Icon(Icons.info_outline_rounded),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          items: <String>['Planned', 'In Progress', 'Completed', 'On Hold']
-                              .map((status) => DropdownMenuItem<String>(
-                                    value: status,
-                                    child: Text(status),
-                                  ))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _selectedStatus = val;
-                              });
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Date Pickers
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => _selectStartDate(context),
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: 'Start Date *',
-                                    prefixIcon: const Icon(Icons.calendar_today_rounded),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  child: Text(DateFormat('MMM d, yyyy').format(_startDate)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => _selectEndDate(context),
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: 'End Date (Optional)',
-                                    prefixIcon: const Icon(Icons.calendar_month_rounded),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  child: Text(_endDate != null ? DateFormat('MMM d, yyyy').format(_endDate!) : 'Not Set'),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Action Buttons
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => context.pop(),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: const Text('Cancel'),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _saveForm,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.primary,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: Text(
-                                  _isEditMode ? 'Save Changes' : 'Create Project',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

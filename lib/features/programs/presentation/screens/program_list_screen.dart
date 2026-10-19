@@ -362,6 +362,55 @@ class _ProgramListScreenState extends ConsumerState<ProgramListScreen> {
                     ),
                   ],
                 ),
+                if (program.imageUrls.isNotEmpty || program.pdfUrls.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      if (program.imageUrls.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withAlpha(25),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.blue.withAlpha(60)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.image_outlined, size: 14, color: Colors.blue),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${program.imageUrls.length} ${program.imageUrls.length == 1 ? "Image" : "Images"}',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (program.pdfUrls.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withAlpha(25),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.red.withAlpha(60)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.picture_as_pdf_outlined, size: 14, color: Colors.red),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${program.pdfUrls.length} ${program.pdfUrls.length == 1 ? "PDF" : "PDFs"}',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
             Text(
@@ -417,6 +466,24 @@ class _ProgramListScreenState extends ConsumerState<ProgramListScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (program.imageUrls.isNotEmpty || program.pdfUrls.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        if (program.imageUrls.isNotEmpty) ...[
+                          Icon(Icons.image_outlined, size: 12, color: Colors.blue.shade700),
+                          const SizedBox(width: 2),
+                          Text('${program.imageUrls.length}', style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                        ],
+                        if (program.pdfUrls.isNotEmpty) ...[
+                          Icon(Icons.picture_as_pdf_outlined, size: 12, color: Colors.red.shade700),
+                          const SizedBox(width: 2),
+                          Text('${program.pdfUrls.length}', style: TextStyle(fontSize: 10, color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+                        ],
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

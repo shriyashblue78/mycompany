@@ -6,6 +6,8 @@ class ProgramModel {
   final String machineId;
   final String machineName;
   final String programName; // e.g., 001, 234, 5-6
+  final List<String> imageUrls;
+  final List<String> pdfUrls;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -15,6 +17,8 @@ class ProgramModel {
     required this.machineId,
     required this.machineName,
     required this.programName,
+    this.imageUrls = const [],
+    this.pdfUrls = const [],
     required this.createdAt,
     required this.updatedAt,
   });
@@ -29,12 +33,21 @@ class ProgramModel {
       return DateTime.now();
     }
 
+    List<String> parseStringList(dynamic value) {
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+
     return ProgramModel(
       programId: id,
       companyId: (map['companyId'] ?? '') as String,
       machineId: (map['machineId'] ?? '') as String,
       machineName: (map['machineName'] ?? '') as String,
       programName: (map['programName'] ?? '') as String,
+      imageUrls: parseStringList(map['imageUrls']),
+      pdfUrls: parseStringList(map['pdfUrls']),
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );
@@ -47,6 +60,8 @@ class ProgramModel {
       'machineId': machineId,
       'machineName': machineName,
       'programName': programName,
+      'imageUrls': imageUrls,
+      'pdfUrls': pdfUrls,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -70,6 +85,8 @@ class ProgramModel {
     String? machineId,
     String? machineName,
     String? programName,
+    List<String>? imageUrls,
+    List<String>? pdfUrls,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -79,6 +96,8 @@ class ProgramModel {
       machineId: machineId ?? this.machineId,
       machineName: machineName ?? this.machineName,
       programName: programName ?? this.programName,
+      imageUrls: imageUrls ?? this.imageUrls,
+      pdfUrls: pdfUrls ?? this.pdfUrls,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
