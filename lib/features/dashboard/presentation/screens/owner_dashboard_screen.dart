@@ -297,8 +297,11 @@ class OwnerDashboardScreen extends ConsumerWidget {
       _ActionData('Log Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
       _ActionData('Add Production', Icons.add_box_rounded, Colors.purple, () => context.push('/production/create')),
       _ActionData('Log Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
+      _ActionData('Inventory', Icons.inventory_2_rounded, Colors.red, () => context.push('/inventory')),
       _ActionData('Inward / Outward', Icons.swap_horiz_rounded, Colors.deepPurple, () => context.push('/inward-outward')),
+      _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
       _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
+      _ActionData('Tally', Icons.receipt_long_rounded, Colors.orange, () => context.push('/tally')),
     ];
     return GridView.count(
       shrinkWrap: true,
@@ -565,6 +568,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
       _ActionData('Inward / Outward', Icons.swap_horiz_rounded, Colors.deepPurple, () => context.push('/inward-outward')),
       _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
       _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
+      _ActionData('Tally', Icons.receipt_long_rounded, Colors.orange, () => context.push('/tally')),
     ];
     return GridView.builder(
       shrinkWrap: true,

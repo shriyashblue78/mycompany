@@ -7,6 +7,7 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/download_app_screen.dart';
 import '../../features/auth/presentation/screens/company_blocked_screen.dart';
 import '../../features/auth/presentation/screens/feature_locked_screen.dart';
+import '../../features/app_lock/presentation/screens/app_lock_screen.dart';
 import '../../features/project_tracker/domain/models/project_tracker_config.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/hr_dashboard_screen.dart';
@@ -113,6 +114,7 @@ import '../../features/masters/presentation/screens/pdi_master_list_screen.dart'
 import '../../features/masters/presentation/screens/state_master_list_screen.dart';
 import '../../features/masters/presentation/screens/clearance_type_list_screen.dart';
 import '../../features/masters/presentation/screens/update_hsn_sac_screen.dart';
+import '../../features/tally/presentation/screens/tally_export_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -180,6 +182,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           '/notifications',
           '/settings',
           '/feature-locked',
+          '/tally',
         ];
         final isAllowed = allowedAccountantRoutes.any((r) => currentRoute.startsWith(r));
         if (!isAllowed) {
@@ -673,6 +676,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/owner-dashboard',
         name: 'owner_dashboard',
         builder: (context, state) => const OwnerDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/tally',
+        name: 'tally_export',
+        builder: (context, state) => const TallyExportScreen(),
       ),
       GoRoute(
         path: '/hr-dashboard',
@@ -1221,6 +1229,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/app-lock',
+        name: 'app_lock',
+        builder: (context, state) => const AppLockScreen(),
       ),
       GoRoute(
         path: '/activity',

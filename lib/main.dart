@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'features/notifications/presentation/providers/notifications_provider.dart';
 
 import 'features/auth/presentation/providers/auth_provider.dart';
+import 'features/app_lock/presentation/widgets/app_lock_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +88,7 @@ class MyApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) => AppLockWrapper(child: child),
     );
   }
 }

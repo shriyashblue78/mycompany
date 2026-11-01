@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,9 @@ import '../../../../core/widgets/responsive_layout.dart';
 import '../../../../core/widgets/responsive_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
+import '../../../app_lock/presentation/providers/app_lock_provider.dart';
+import '../../../app_lock/presentation/screens/app_lock_setup_sheet.dart';
+import '../../../app_lock/domain/models/app_lock_state.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -142,7 +146,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       const SizedBox(height: AppSizes.p32),
                     ],
 
-                    // 3. App Settings / Actions Section
+                    // 3. App Security & Lock Section
+                    _buildSectionHeader(theme, 'App Security & Lock', Icons.security_rounded),
+                    const SizedBox(height: AppSizes.p12),
+                    _buildAppLockCard(context, theme, isDark),
+                    const SizedBox(height: AppSizes.p32),
+
+                    // 4. App Settings / Actions Section
                     _buildSectionHeader(theme, 'App Actions', Icons.settings_applications_rounded),
                     const SizedBox(height: AppSizes.p12),
                     _buildActionsCard(context, theme, canChangePassword, isDark),
@@ -704,6 +714,152 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildAppLockCard(BuildContext context, ThemeData theme, bool isDark) {
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+
+    if (!isMobile) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.dividerColor.withAlpha(40)),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(AppSizes.p16),
+          child: Row(
+            children: [
+              Icon(Icons.phone_android_rounded, color: Colors.grey),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'App Lock (PIN & Biometrics) is available on mobile devices.',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final lockState = ref.watch(appLockProvider);
+    final primaryColor = theme.colorScheme.primary;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.dividerColor.withAlpha(40)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
+        child: Column(
+          children: [
+            SwitchListTile(
+              secondary: Icon(
+                lockState.isEnabled ? Icons.lock_rounded : Icons.lock_open_rounded,
+                color: lockState.isEnabled ? primaryColor : theme.iconTheme.color,
+              ),
+              title: const Text('Enable App Lock', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                lockState.isEnabled
+                    ? (lockState.hasPin ? 'Protected with ${lockState.pinLength}-digit PIN' : 'Active')
+                    : 'Require PIN or biometrics to open the app',
+                style: const TextStyle(fontSize: 12),
+              ),
+              value: lockState.isEnabled,
+              activeColor: primaryColor,
+              onChanged: (bool value) async {
+                if (value) {
+                  if (!lockState.hasPin) {
+                    await AppLockSetupSheet.show(context, mode: AppLockSetupMode.create);
+                  } else {
+                    await ref.read(appLockProvider.notifier).setAppLockEnabled(true);
+                  }
+                } else {
+                  _showDisableAppLockDialog(context);
+                }
+              },
+            ),
+            if (lockState.isEnabled && lockState.hasPin) ...[
+              Divider(height: 1, color: theme.dividerColor.withAlpha(30)),
+              SwitchListTile(
+                secondary: Icon(
+                  lockState.biometricCapability == BiometricCapability.face
+                      ? Icons.face_rounded
+                      : Icons.fingerprint_rounded,
+                  color: lockState.biometricsEnabled ? primaryColor : theme.iconTheme.color,
+                ),
+                title: Text('Unlock with ${lockState.biometricName}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: Text(
+                  lockState.canCheckBiometrics
+                      ? 'Use fingerprint or face recognition'
+                      : 'Biometrics unavailable or not enrolled',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                value: lockState.biometricsEnabled && lockState.canCheckBiometrics,
+                activeColor: primaryColor,
+                onChanged: lockState.canCheckBiometrics
+                    ? (bool value) async {
+                        await ref.read(appLockProvider.notifier).setBiometricsEnabled(value);
+                      }
+                    : null,
+              ),
+              Divider(height: 1, color: theme.dividerColor.withAlpha(30)),
+              ListTile(
+                leading: Icon(Icons.pin_outlined, color: primaryColor),
+                title: const Text('Change App PIN', style: TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: Text('Current: ${lockState.pinLength}-digit PIN', style: const TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  AppLockSetupSheet.show(context, mode: AppLockSetupMode.change);
+                },
+              ),
+              Divider(height: 1, color: theme.dividerColor.withAlpha(30)),
+              ListTile(
+                leading: const Icon(Icons.screen_lock_portrait_rounded, color: Colors.blueAccent),
+                title: const Text('Lock App Now', style: TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: const Text('Immediately trigger the lock screen to test', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  ref.read(appLockProvider.notifier).lock();
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDisableAppLockDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disable App Lock?'),
+        content: const Text(
+          'Your app will no longer be locked when returning from the background or upon launch.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(appLockProvider.notifier).setAppLockEnabled(false);
+            },
+            child: const Text('Disable', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 }

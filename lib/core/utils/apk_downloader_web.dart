@@ -21,8 +21,8 @@ Future<Map<String, dynamic>> fetchApkConfig() async {
   // Fallback defaults
   return {
     'version': '1.0.0',
-    'apk_url': '/downloads/app-arm64-v8a-release.apk',
-    'apk_filename': 'MyCompanyERP.apk',
+    'apk_url': '/downloads/app-release.apk',
+    'apk_filename': 'MyCompanyERP-Universal.apk',
   };
 }
 
@@ -30,8 +30,8 @@ Future<Map<String, dynamic>> fetchApkConfig() async {
 /// The APK must be hosted at the URL specified in /apk_config.json.
 Future<void> downloadApk() async {
   final config = await fetchApkConfig();
-  final url = config['apk_url'] as String? ?? '/downloads/app-arm64-v8a-release.apk';
-  final filename = config['apk_filename'] as String? ?? 'MyCompanyERP.apk';
+  final url = config['apk_url'] as String? ?? '/downloads/app-release.apk';
+  final filename = config['apk_filename'] as String? ?? 'MyCompanyERP-Universal.apk';
 
   final anchor = html.AnchorElement(href: url)
     ..setAttribute('download', filename)

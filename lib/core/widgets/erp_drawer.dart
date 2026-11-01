@@ -10,11 +10,73 @@ import '../constants/app_strings.dart';
 import '../../features/auth/domain/models/user_model.dart';
 import '../../features/subscription/presentation/providers/subscription_provider.dart';
 
-class ERPDrawer extends ConsumerWidget {
+class ERPDrawer extends ConsumerStatefulWidget {
   const ERPDrawer({super.key});
 
+  /// Preserved scroll position across screen navigations
+  static double savedScrollOffset = 0.0;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ERPDrawer> createState() => _ERPDrawerState();
+}
+
+class _ERPDrawerState extends ConsumerState<ERPDrawer> {
+  late ScrollController _scrollController;
+  final GlobalKey _selectedItemKey = GlobalKey();
+  bool _isDisposing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController(
+      initialScrollOffset: ERPDrawer.savedScrollOffset,
+      keepScrollOffset: false,
+    );
+    _scheduleScrollRestoration();
+  }
+
+  void _scheduleScrollRestoration() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isDisposing) return;
+      _restoreScrollPosition();
+
+      // If maxScrollExtent is still 0 during layout, retry once after layout stabilizes
+      if (_scrollController.hasClients && _scrollController.position.maxScrollExtent == 0) {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && !_isDisposing) {
+            _restoreScrollPosition();
+          }
+        });
+      }
+    });
+  }
+
+  void _restoreScrollPosition() {
+    if (!mounted || _isDisposing || !_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    if (ERPDrawer.savedScrollOffset > 0 && maxScroll > 0) {
+      final target = ERPDrawer.savedScrollOffset.clamp(0.0, maxScroll);
+      if ((_scrollController.offset - target).abs() > 1.0) {
+        _scrollController.jumpTo(target);
+      }
+    } else if (_selectedItemKey.currentContext != null) {
+      Scrollable.ensureVisible(
+        _selectedItemKey.currentContext!,
+        alignment: 0.3,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposing = true;
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -96,12 +158,27 @@ class ERPDrawer extends ConsumerWidget {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _buildNavigationGroups(context, role, currentRoute, isDark, theme, ref),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (_isDisposing) return false;
+                  if (notification is ScrollUpdateNotification) {
+                    final pixels = notification.metrics.pixels;
+                    if (notification.dragDetails != null) {
+                      ERPDrawer.savedScrollOffset = pixels.clamp(0.0, notification.metrics.maxScrollExtent);
+                    } else if (pixels > 0) {
+                      ERPDrawer.savedScrollOffset = pixels;
+                    }
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildNavigationGroups(context, role, currentRoute, isDark, theme, ref),
+                    ),
                   ),
                 ),
               ),
@@ -212,7 +289,7 @@ class ERPDrawer extends ConsumerWidget {
       if (role == 'Owner' || role == 'HR' || role == 'Supervisor') {
         mainItems.add(_NavItem(AppStrings.navTasks, Icons.assignment_rounded, '/tasks', isLocked: tasksLocked));
       } else {
-        mainItems.add(_NavItem('My Tasks', Icons.checklist_rounded, '/tasks', isLocked: tasksLocked));
+        mainItems.add(_NavItem('My Tasks', Icons.checklist_rounded, '/tasks/my-tasks', isLocked: tasksLocked));
       }
 
       final leavesLocked = !isModuleEnabled(CompanyModules.leaves);
@@ -255,6 +332,7 @@ class ERPDrawer extends ConsumerWidget {
     if (role == 'Owner' || role == 'Accountant') {
       operationsItems.add(_NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase', isLocked: !isModuleEnabled(CompanyModules.purchase)));
       operationsItems.add(_NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales', isLocked: !isModuleEnabled(CompanyModules.sales)));
+      operationsItems.add(const _NavItem('Tally Integration', Icons.receipt_long_rounded, '/tally'));
     }
 
     if (role != 'Accountant' && hasProjectTrackerAccess(authState.user)) {
@@ -365,6 +443,7 @@ class ERPDrawer extends ConsumerWidget {
           style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 14),
         ),
         onTap: () {
+          ERPDrawer.savedScrollOffset = 0.0;
           ref.read(authProvider.notifier).logout();
         },
       ),
@@ -410,10 +489,14 @@ class ERPDrawer extends ConsumerWidget {
     String role,
   ) {
     final bool isSelected;
-    if (item.route == '/-dashboard') {
+    if (item.route.isEmpty) {
+      isSelected = false;
+    } else if (item.route == '/-dashboard') {
       isSelected = currentRoute.endsWith('-dashboard');
+    } else if (item.route == '/tasks') {
+      isSelected = currentRoute == '/tasks';
     } else {
-      isSelected = currentRoute.startsWith(item.route);
+      isSelected = currentRoute == item.route || currentRoute.startsWith('${item.route}/');
     }
 
     final Color iconColor;
@@ -435,6 +518,7 @@ class ERPDrawer extends ConsumerWidget {
     }
 
     return Container(
+      key: isSelected ? _selectedItemKey : null,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
         color: tileColor ?? Colors.transparent,
@@ -464,6 +548,11 @@ class ERPDrawer extends ConsumerWidget {
               : null,
           dense: true,
           onTap: () {
+            // Snapshot scroll position before any navigation or drawer dismiss
+            if (_scrollController.hasClients && _scrollController.offset > 0) {
+              ERPDrawer.savedScrollOffset = _scrollController.offset;
+            }
+
             final ScaffoldState? scaffold = Scaffold.maybeOf(context);
             if (scaffold != null && scaffold.isDrawerOpen) {
               Navigator.of(context).pop();
@@ -474,7 +563,12 @@ class ERPDrawer extends ConsumerWidget {
               return;
             }
 
-            if (item.title == AppStrings.navDashboard) {
+            // If already on this exact item, stay fixed and do nothing
+            if (isSelected) {
+              return;
+            }
+
+            if (item.route == '/-dashboard') {
               if (role == 'Owner') {
                 context.go('/owner-dashboard');
               } else if (role == 'HR' || role == 'Supervisor') {
@@ -482,80 +576,8 @@ class ERPDrawer extends ConsumerWidget {
               } else {
                 context.go('/employee-dashboard');
               }
-            } else if (item.title == AppStrings.navEmployees) {
-              context.push('/employees');
-            } else if (item.title == AppStrings.navAttendance || item.title == 'My Attendance') {
-              context.push('/attendance');
-            } else if (item.title == AppStrings.navTasks) {
-              context.push('/tasks');
-            } else if (item.title == 'My Tasks') {
-              context.push('/tasks/my-tasks');
-            } else if (item.title == AppStrings.navLeaveApproval || item.title == 'Leaves Portal' || item.title == 'Apply Leave') {
-              context.push('/leaves');
-            } else if (item.title == AppStrings.navNotifications) {
-              context.push('/notifications');
-            } else if (item.title == 'Machines') {
-              context.push('/machines');
-            } else if (item.title == 'Tooling') {
-              context.push('/tooling');
-            } else if (item.title == 'Drawings') {
-              context.push('/drawings');
-            } else if (item.title == 'Programs') {
-              context.push('/programs');
-            } else if (item.title == AppStrings.navInventory) {
-              context.push('/inventory');
-            } else if (item.title == AppStrings.navProduction) {
-              context.push('/production');
-            } else if (item.title == AppStrings.navPurchase) {
-              context.push('/purchase');
-            } else if (item.title == AppStrings.navSales) {
-              context.push('/sales');
-            } else if (item.title == 'Masters') {
-              context.push('/masters');
-            } else if (item.title == 'Party Master') {
-              context.push('/parties');
-            } else if (item.title == 'Category Master') {
-              context.push('/masters/categories');
-            } else if (item.title == 'Group Master') {
-              context.push('/masters/groups');
-            } else if (item.title == 'Update Item Group' || item.route == '/masters/update-item-group') {
-              context.push('/masters/update-item-group');
-            } else if (item.title == 'Unit Master') {
-              context.push('/masters/units');
-            } else if (item.title == 'Item Master') {
-              context.push('/masters/items');
-            } else if (item.title == 'Tax Master') {
-              context.push('/masters/taxes');
-            } else if (item.title == 'HSN/SAC Master') {
-              context.push('/masters/hsn-sac');
-            } else if (item.title == 'Process Master') {
-              context.push('/masters/processes');
-            } else if (item.title == 'Transaction Type Master') {
-              context.push('/masters/transaction-types');
-            } else if (item.title == 'Rejection Reason Master' || item.route == '/masters/rejection-reasons') {
-              context.push('/masters/rejection-reasons');
-            } else if (item.title == 'Opening Balance Entry' || item.route == '/masters/opening-balance') {
-              context.push('/masters/opening-balance');
-            } else if (item.title == 'PDI Master' || item.route == '/masters/pdi') {
-              context.push('/masters/pdi');
-            } else if (item.title == 'State Master' || item.route == '/masters/states') {
-              context.push('/masters/states');
-            } else if (item.title == 'Clearance Type Master' || item.route == '/masters/clearance-types') {
-              context.push('/masters/clearance-types');
-            } else if (item.title == 'Update HSN/SAC' || item.route == '/masters/update-hsn-sac') {
-              context.push('/masters/update-hsn-sac');
-            } else if (item.title == 'Inward / Outward') {
-              context.push('/inward-outward');
-            } else if (item.title == 'Project Tracker') {
-              context.push('/project-tracker');
-            } else if (item.title == 'Comparison') {
-              context.push('/comparison');
-            } else if (item.title == AppStrings.navSettings || item.title == AppStrings.navProfile) {
-              context.push('/settings');
-            } else if (item.title == AppStrings.navReports || item.title == AppStrings.navAnalytics) {
-              context.push('/reports');
-            } else if (item.title == 'Subscription & Plans' || item.route == '/subscription/plans') {
-              context.push('/subscription/plans');
+            } else if (item.route.isNotEmpty) {
+              context.go(item.route);
             } else {
               _showTodoDialog(context, item.title, role);
             }
