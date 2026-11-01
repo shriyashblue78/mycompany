@@ -37,6 +37,20 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
         backgroundColor: theme.colorScheme.surface,
         iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
         actions: [
+          if (role == 'Owner' || role == 'Accountant')
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/masters/opening-balance'),
+                icon: const Icon(Icons.account_balance_wallet_rounded, size: 16),
+                label: const Text('Opening Balance'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSizes.buttonRadius),
+                  ),
+                ),
+              ),
+            ),
           if (hasEditAccess)
             Padding(
               padding: const EdgeInsets.only(right: AppSizes.p16),

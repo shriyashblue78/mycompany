@@ -255,7 +255,6 @@ class ERPDrawer extends ConsumerWidget {
     if (role == 'Owner' || role == 'Accountant') {
       operationsItems.add(_NavItem(AppStrings.navPurchase, Icons.shopping_cart_rounded, '/purchase', isLocked: !isModuleEnabled(CompanyModules.purchase)));
       operationsItems.add(_NavItem(AppStrings.navSales, Icons.sell_rounded, '/sales', isLocked: !isModuleEnabled(CompanyModules.sales)));
-      operationsItems.add(_NavItem('Party Master', Icons.business_rounded, '/parties'));
     }
 
     if (role != 'Accountant' && hasProjectTrackerAccess(authState.user)) {
@@ -270,6 +269,33 @@ class ERPDrawer extends ConsumerWidget {
     if (operationsItems.isNotEmpty) {
       children.add(_buildSectionHeader('OPERATIONS'));
       children.addAll(operationsItems.map((item) => _buildTile(context, item, currentRoute, isDark, theme, role)));
+      children.add(const SizedBox(height: 12));
+    }
+
+    // MASTERS Section
+    final mastersItems = <_NavItem>[];
+    if (role == 'Owner' || role == 'Accountant') {
+      mastersItems.add(const _NavItem('Party Master', Icons.business_rounded, '/parties'));
+      mastersItems.add(const _NavItem('Category Master', Icons.category_rounded, '/masters/categories'));
+      mastersItems.add(const _NavItem('Group Master', Icons.folder_special_rounded, '/masters/groups'));
+      mastersItems.add(const _NavItem('Update Item Group', Icons.edit_note_rounded, '/masters/update-item-group'));
+      mastersItems.add(const _NavItem('Unit Master', Icons.straighten_rounded, '/masters/units'));
+      mastersItems.add(const _NavItem('Item Master', Icons.inventory_2_rounded, '/masters/items'));
+      mastersItems.add(const _NavItem('Tax Master', Icons.account_balance_rounded, '/masters/taxes'));
+      mastersItems.add(const _NavItem('HSN/SAC Master', Icons.tag_rounded, '/masters/hsn-sac'));
+      mastersItems.add(const _NavItem('Process Master', Icons.alt_route_rounded, '/masters/processes'));
+      mastersItems.add(const _NavItem('Transaction Type Master', Icons.swap_horiz_rounded, '/masters/transaction-types'));
+      mastersItems.add(const _NavItem('Rejection Reason Master', Icons.assignment_late_rounded, '/masters/rejection-reasons'));
+      mastersItems.add(const _NavItem('Opening Balance Entry', Icons.account_balance_wallet_rounded, '/masters/opening-balance'));
+      mastersItems.add(const _NavItem('PDI Master', Icons.fact_check_rounded, '/masters/pdi'));
+      mastersItems.add(const _NavItem('State Master', Icons.location_on_rounded, '/masters/states'));
+      mastersItems.add(const _NavItem('Clearance Type Master', Icons.verified_user_rounded, '/masters/clearance-types'));
+      mastersItems.add(const _NavItem('Update HSN/SAC', Icons.tune_rounded, '/masters/update-hsn-sac'));
+    }
+
+    if (mastersItems.isNotEmpty) {
+      children.add(_buildSectionHeader('MASTERS'));
+      children.addAll(mastersItems.map((item) => _buildTile(context, item, currentRoute, isDark, theme, role)));
       children.add(const SizedBox(height: 12));
     }
 
@@ -484,8 +510,40 @@ class ERPDrawer extends ConsumerWidget {
               context.push('/purchase');
             } else if (item.title == AppStrings.navSales) {
               context.push('/sales');
+            } else if (item.title == 'Masters') {
+              context.push('/masters');
             } else if (item.title == 'Party Master') {
               context.push('/parties');
+            } else if (item.title == 'Category Master') {
+              context.push('/masters/categories');
+            } else if (item.title == 'Group Master') {
+              context.push('/masters/groups');
+            } else if (item.title == 'Update Item Group' || item.route == '/masters/update-item-group') {
+              context.push('/masters/update-item-group');
+            } else if (item.title == 'Unit Master') {
+              context.push('/masters/units');
+            } else if (item.title == 'Item Master') {
+              context.push('/masters/items');
+            } else if (item.title == 'Tax Master') {
+              context.push('/masters/taxes');
+            } else if (item.title == 'HSN/SAC Master') {
+              context.push('/masters/hsn-sac');
+            } else if (item.title == 'Process Master') {
+              context.push('/masters/processes');
+            } else if (item.title == 'Transaction Type Master') {
+              context.push('/masters/transaction-types');
+            } else if (item.title == 'Rejection Reason Master' || item.route == '/masters/rejection-reasons') {
+              context.push('/masters/rejection-reasons');
+            } else if (item.title == 'Opening Balance Entry' || item.route == '/masters/opening-balance') {
+              context.push('/masters/opening-balance');
+            } else if (item.title == 'PDI Master' || item.route == '/masters/pdi') {
+              context.push('/masters/pdi');
+            } else if (item.title == 'State Master' || item.route == '/masters/states') {
+              context.push('/masters/states');
+            } else if (item.title == 'Clearance Type Master' || item.route == '/masters/clearance-types') {
+              context.push('/masters/clearance-types');
+            } else if (item.title == 'Update HSN/SAC' || item.route == '/masters/update-hsn-sac') {
+              context.push('/masters/update-hsn-sac');
             } else if (item.title == 'Inward / Outward') {
               context.push('/inward-outward');
             } else if (item.title == 'Project Tracker') {

@@ -94,6 +94,25 @@ import '../../features/project_tracker/presentation/screens/project_detail_scree
 import '../../features/super_admin/presentation/screens/super_admin_subscription_screen.dart';
 import '../../features/subscription/presentation/screens/customer_subscription_plans_screen.dart';
 import '../../features/subscription/presentation/screens/customer_checkout_screen.dart';
+import '../../features/masters/presentation/screens/masters_dashboard_screen.dart';
+import '../../features/masters/presentation/screens/master_placeholder_screen.dart';
+import '../../features/masters/presentation/screens/category_list_screen.dart';
+import '../../features/masters/presentation/screens/group_list_screen.dart';
+import '../../features/masters/presentation/screens/update_item_group_screen.dart';
+import '../../features/masters/presentation/screens/unit_list_screen.dart';
+import '../../features/masters/presentation/screens/item_list_screen.dart';
+import '../../features/masters/presentation/screens/item_form_screen.dart';
+import '../../features/masters/presentation/screens/tax_list_screen.dart';
+import '../../features/masters/presentation/screens/tax_form_screen.dart';
+import '../../features/masters/presentation/screens/hsn_sac_list_screen.dart';
+import '../../features/masters/presentation/screens/process_list_screen.dart';
+import '../../features/masters/presentation/screens/rejection_reason_list_screen.dart';
+import '../../features/masters/presentation/screens/transaction_type_list_screen.dart';
+import '../../features/masters/presentation/screens/opening_balance_screen.dart';
+import '../../features/masters/presentation/screens/pdi_master_list_screen.dart';
+import '../../features/masters/presentation/screens/state_master_list_screen.dart';
+import '../../features/masters/presentation/screens/clearance_type_list_screen.dart';
+import '../../features/masters/presentation/screens/update_hsn_sac_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -157,6 +176,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           '/purchase',
           '/purchases',
           '/parties',
+          '/masters',
           '/notifications',
           '/settings',
           '/feature-locked',
@@ -285,7 +305,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // 11. Purchase
+      // 11. Masters
+      final hasMastersRolePermission = currentAuthState.selectedRole == 'Owner' ||
+          currentAuthState.selectedRole == 'Accountant';
+      if (currentRoute.startsWith('/masters')) {
+        if (!hasMastersRolePermission) {
+          return _getDashboardRoute(currentAuthState.selectedRole);
+        }
+      }
+
+      // 12. Purchase
       final hasPurchaseRolePermission = currentAuthState.selectedRole == 'Owner' ||
           currentAuthState.selectedRole == 'Accountant';
       if (currentRoute.startsWith('/purchase') || currentRoute.startsWith('/purchases')) {
@@ -1049,6 +1078,117 @@ final routerProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return PartyFormScreen(partyId: id);
         },
+      ),
+      GoRoute(
+        path: '/masters',
+        name: 'masters_dashboard',
+        builder: (context, state) => const MastersDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/masters/categories',
+        name: 'master_categories',
+        builder: (context, state) => const CategoryListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/groups',
+        name: 'master_groups',
+        builder: (context, state) => const GroupListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/update-item-group',
+        name: 'master_update_item_group',
+        builder: (context, state) => const UpdateItemGroupScreen(),
+      ),
+      GoRoute(
+        path: '/masters/units',
+        name: 'master_units',
+        builder: (context, state) => const UnitListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/items',
+        name: 'master_items',
+        builder: (context, state) => const ItemListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/items/add',
+        name: 'master_items_add',
+        builder: (context, state) => const ItemFormScreen(),
+      ),
+      GoRoute(
+        path: '/masters/items/edit/:id',
+        name: 'master_items_edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ItemFormScreen(itemId: id);
+        },
+      ),
+      GoRoute(
+        path: '/masters/taxes',
+        name: 'master_taxes',
+        builder: (context, state) => const TaxListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/taxes/add',
+        name: 'master_taxes_add',
+        builder: (context, state) => const TaxFormScreen(),
+      ),
+      GoRoute(
+        path: '/masters/taxes/edit/:id',
+        name: 'master_taxes_edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return TaxFormScreen(taxId: id);
+        },
+      ),
+      GoRoute(
+        path: '/masters/hsn-sac',
+        name: 'master_hsn_sac',
+        builder: (context, state) => const HsnSacListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/processes',
+        name: 'master_processes',
+        builder: (context, state) => const ProcessListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/transaction-types',
+        name: 'master_transaction_types',
+        builder: (context, state) => const TransactionTypeListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/rejection-reasons',
+        name: 'master_rejection_reasons',
+        builder: (context, state) => const RejectionReasonListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/opening-balance',
+        name: 'master_opening_balance',
+        builder: (context, state) => const OpeningBalanceScreen(),
+      ),
+      GoRoute(
+        path: '/masters/pdi',
+        name: 'master_pdi',
+        builder: (context, state) => const PdiMasterListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/states',
+        name: 'master_states',
+        builder: (context, state) => const StateMasterListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/clearance-types',
+        name: 'master_clearance_types',
+        builder: (context, state) => const ClearanceTypeListScreen(),
+      ),
+      GoRoute(
+        path: '/masters/update-hsn-sac',
+        name: 'master_update_hsn_sac',
+        builder: (context, state) => const UpdateHsnSacScreen(),
+      ),
+      GoRoute(
+        path: '/inventory/opening-balance',
+        name: 'inventory_opening_balance_alias',
+        builder: (context, state) => const OpeningBalanceScreen(),
       ),
       GoRoute(
         path: '/production',
