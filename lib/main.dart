@@ -10,6 +10,8 @@ import 'features/notifications/presentation/providers/notifications_provider.dar
 
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/app_lock/presentation/widgets/app_lock_wrapper.dart';
+import 'core/widgets/global_keyboard_navigation_wrapper.dart';
+import 'features/ai_assistant/presentation/widgets/floating_ai_assistant_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,7 +90,19 @@ class MyApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) => AppLockWrapper(child: child),
+      builder: (context, child) => AppLockWrapper(
+        child: GlobalKeyboardNavigationWrapper(
+          child: Overlay(
+            initialEntries: [
+              OverlayEntry(
+                builder: (context) => FloatingAiAssistantWrapper(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

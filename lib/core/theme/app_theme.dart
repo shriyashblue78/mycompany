@@ -18,8 +18,19 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         onSurface: Color(0xFF1F2937), // Dark grey text
       ),
-      textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
+      textTheme: GoogleFonts.robotoTextTheme(ThemeData.light().textTheme),
       scaffoldBackgroundColor: AppColors.backgroundLight,
+      drawerTheme: const DrawerThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Colors.transparent,
+        thickness: 0,
+        space: 0,
+      ),
       cardTheme: CardThemeData(
         color: AppColors.surfaceLight,
         elevation: 0,
@@ -83,8 +94,19 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         onSurface: Colors.white,
       ),
-      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
+      textTheme: GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme),
       scaffoldBackgroundColor: AppColors.backgroundDark,
+      drawerTheme: const DrawerThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Colors.transparent,
+        thickness: 0,
+        space: 0,
+      ),
       cardTheme: CardThemeData(
         color: AppColors.surfaceDark,
         elevation: 0,

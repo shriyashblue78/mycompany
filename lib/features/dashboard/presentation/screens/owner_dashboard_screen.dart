@@ -269,9 +269,9 @@ class OwnerDashboardScreen extends ConsumerWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 110,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: 68,
             children: cards,
           ),
           const SizedBox(height: 24),
@@ -293,48 +293,85 @@ class OwnerDashboardScreen extends ConsumerWidget {
 
   Widget _buildMobileQuickActions(BuildContext context) {
     final actions = [
-      _ActionData('Add Workforce', Icons.person_add_alt_1_rounded, Colors.blue, () => context.push('/employees/add')),
-      _ActionData('Log Purchase', Icons.add_shopping_cart_rounded, Colors.teal, () => context.push('/purchase/add')),
-      _ActionData('Add Production', Icons.add_box_rounded, Colors.purple, () => context.push('/production/create')),
-      _ActionData('Log Sale', Icons.point_of_sale_rounded, Colors.amber, () => context.push('/sales/add')),
-      _ActionData('Inventory', Icons.inventory_2_rounded, Colors.red, () => context.push('/inventory')),
-      _ActionData('Inward / Outward', Icons.swap_horiz_rounded, Colors.deepPurple, () => context.push('/inward-outward')),
-      _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
-      _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
-      _ActionData('Tally', Icons.receipt_long_rounded, Colors.orange, () => context.push('/tally')),
+      _ActionData('Add Workforce', Icons.person_add_alt_1_rounded, const Color(0xFF2563EB), () => context.push('/employees/add')),
+      _ActionData('Log Purchase', Icons.shopping_cart_outlined, const Color(0xFF0D9488), () => context.push('/purchase/add')),
+      _ActionData('Add Production', Icons.add_circle_outline_rounded, const Color(0xFF7C3AED), () => context.push('/production/create')),
+      _ActionData('Log Sale', Icons.receipt_long_outlined, const Color(0xFFD97706), () => context.push('/sales/add')),
+      _ActionData('Inventory', Icons.inventory_2_outlined, const Color(0xFFDC2626), () => context.push('/inventory')),
+      _ActionData('Inward / Outward', Icons.swap_horiz_rounded, const Color(0xFF6366F1), () => context.push('/inward-outward')),
+      _ActionData('Attendance', Icons.fingerprint_rounded, const Color(0xFF059669), () => context.push('/attendance')),
+      _ActionData('Machines', Icons.precision_manufacturing_outlined, const Color(0xFF0891B2), () => context.push('/machines')),
+      _ActionData('Tally', Icons.receipt_long_rounded, const Color(0xFFEA580C), () => context.push('/tally')),
     ];
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      mainAxisExtent: 68,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      mainAxisExtent: 110,
       children: actions.map((a) {
         return InkWell(
           onTap: a.onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: a.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: a.color.withOpacity(0.3)),
+              color: isDark
+                  ? a.color.withOpacity(0.08)
+                  : a.color.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? a.color.withOpacity(0.25)
+                    : a.color.withOpacity(0.20),
+                width: 1,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: a.color.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(a.icon, color: a.color, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    a.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: a.color,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: a.color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(a.icon, color: a.color, size: 22),
                     ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: a.color.withOpacity(0.6),
+                    ),
+                  ],
+                ),
+                Text(
+                  a.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    height: 1.2,
+                    color: isDark ? Colors.white : const Color(0xFF1F2937),
                   ),
                 ),
               ],

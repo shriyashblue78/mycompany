@@ -245,9 +245,9 @@ class HRDashboardScreen extends ConsumerWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 110,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: 68,
             children: cards,
           ),
           const SizedBox(height: 24),
@@ -265,44 +265,81 @@ class HRDashboardScreen extends ConsumerWidget {
 
   Widget _buildMobileQuickActions(BuildContext context) {
     final actions = [
-      _ActionData('Employees', Icons.people_rounded, Colors.blue, () => context.push('/employees')),
-      _ActionData('Attendance', Icons.fingerprint_rounded, Colors.green, () => context.push('/attendance')),
-      _ActionData('Leaves', Icons.time_to_leave_outlined, Colors.orange, () => context.push('/leaves')),
-      _ActionData('Reports', Icons.bar_chart_rounded, Colors.purple, () => context.push('/reports')),
-      _ActionData('Machines', Icons.settings_rounded, Colors.cyan, () => context.push('/machines')),
+      _ActionData('Employees', Icons.people_rounded, const Color(0xFF2563EB), () => context.push('/employees')),
+      _ActionData('Attendance', Icons.fingerprint_rounded, const Color(0xFF059669), () => context.push('/attendance')),
+      _ActionData('Leaves', Icons.time_to_leave_outlined, const Color(0xFFEA580C), () => context.push('/leaves')),
+      _ActionData('Reports', Icons.bar_chart_rounded, const Color(0xFF7C3AED), () => context.push('/reports')),
+      _ActionData('Machines', Icons.settings_rounded, const Color(0xFF0891B2), () => context.push('/machines')),
     ];
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      mainAxisExtent: 68,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      mainAxisExtent: 110,
       children: actions.map((a) {
         return InkWell(
           onTap: a.onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: a.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: a.color.withOpacity(0.3)),
+              color: isDark
+                  ? a.color.withOpacity(0.08)
+                  : a.color.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? a.color.withOpacity(0.25)
+                    : a.color.withOpacity(0.20),
+                width: 1,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: a.color.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(a.icon, color: a.color, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    a.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: a.color,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: a.color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(a.icon, color: a.color, size: 22),
                     ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: a.color.withOpacity(0.6),
+                    ),
+                  ],
+                ),
+                Text(
+                  a.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13.5,
+                    height: 1.2,
+                    color: isDark ? Colors.white : const Color(0xFF1F2937),
                   ),
                 ),
               ],

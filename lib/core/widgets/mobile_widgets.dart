@@ -203,48 +203,49 @@ class MobileStatCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: width,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? theme.colorScheme.surface : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            color: isDark ? AppColors.borderDark : const Color(0xFFE5E7EB),
+            width: 1,
           ),
           boxShadow: isDark
               ? []
               : [
                   BoxShadow(
-                    color: color.withOpacity(0.07),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                shape: BoxShape.circle,
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 16),
+              child: Icon(icon, color: color, size: 20),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     value,
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
                       color: theme.colorScheme.onSurface,
+                      letterSpacing: -0.3,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -253,8 +254,8 @@ class MobileStatCard extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 10,
-                      color: theme.colorScheme.onSurface.withOpacity(0.55),
+                      fontSize: 11.5,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
@@ -262,6 +263,11 @@ class MobileStatCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: theme.colorScheme.onSurface.withOpacity(0.35),
             ),
           ],
         ),

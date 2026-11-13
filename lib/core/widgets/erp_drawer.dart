@@ -88,6 +88,10 @@ class _ERPDrawerState extends ConsumerState<ERPDrawer> {
     final currentRoute = GoRouterState.of(context).uri.path;
 
     return Drawer(
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
       child: SafeArea(
         top: false,
         child: Column(
@@ -347,33 +351,6 @@ class _ERPDrawerState extends ConsumerState<ERPDrawer> {
     if (operationsItems.isNotEmpty) {
       children.add(_buildSectionHeader('OPERATIONS'));
       children.addAll(operationsItems.map((item) => _buildTile(context, item, currentRoute, isDark, theme, role)));
-      children.add(const SizedBox(height: 12));
-    }
-
-    // MASTERS Section
-    final mastersItems = <_NavItem>[];
-    if (role == 'Owner' || role == 'Accountant') {
-      mastersItems.add(const _NavItem('Party Master', Icons.business_rounded, '/parties'));
-      mastersItems.add(const _NavItem('Category Master', Icons.category_rounded, '/masters/categories'));
-      mastersItems.add(const _NavItem('Group Master', Icons.folder_special_rounded, '/masters/groups'));
-      mastersItems.add(const _NavItem('Update Item Group', Icons.edit_note_rounded, '/masters/update-item-group'));
-      mastersItems.add(const _NavItem('Unit Master', Icons.straighten_rounded, '/masters/units'));
-      mastersItems.add(const _NavItem('Item Master', Icons.inventory_2_rounded, '/masters/items'));
-      mastersItems.add(const _NavItem('Tax Master', Icons.account_balance_rounded, '/masters/taxes'));
-      mastersItems.add(const _NavItem('HSN/SAC Master', Icons.tag_rounded, '/masters/hsn-sac'));
-      mastersItems.add(const _NavItem('Process Master', Icons.alt_route_rounded, '/masters/processes'));
-      mastersItems.add(const _NavItem('Transaction Type Master', Icons.swap_horiz_rounded, '/masters/transaction-types'));
-      mastersItems.add(const _NavItem('Rejection Reason Master', Icons.assignment_late_rounded, '/masters/rejection-reasons'));
-      mastersItems.add(const _NavItem('Opening Balance Entry', Icons.account_balance_wallet_rounded, '/masters/opening-balance'));
-      mastersItems.add(const _NavItem('PDI Master', Icons.fact_check_rounded, '/masters/pdi'));
-      mastersItems.add(const _NavItem('State Master', Icons.location_on_rounded, '/masters/states'));
-      mastersItems.add(const _NavItem('Clearance Type Master', Icons.verified_user_rounded, '/masters/clearance-types'));
-      mastersItems.add(const _NavItem('Update HSN/SAC', Icons.tune_rounded, '/masters/update-hsn-sac'));
-    }
-
-    if (mastersItems.isNotEmpty) {
-      children.add(_buildSectionHeader('MASTERS'));
-      children.addAll(mastersItems.map((item) => _buildTile(context, item, currentRoute, isDark, theme, role)));
       children.add(const SizedBox(height: 12));
     }
 

@@ -19,6 +19,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  <!-- Allow native browser pinch-to-zoom (like YouTube/Instagram) up to 5x -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,6 +33,93 @@
 
   <title>MyCompany</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Allow pan gestures but let our JS handle zoom — prevents browser
+       from fighting our custom CSS body zoom implementation */
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    flutter-view, flt-glass-pane, flt-scene-host {
+      touch-action: pan-x pan-y !important;
+    }
+  </style>
+
+  <!--
+    ZOOM FIX: We intercept Ctrl+Wheel and two-finger pinch ourselves,
+    apply CSS `zoom` on <body>, which triggers Flutter to re-render at
+    the correct size — no distortion, no white screen.
+    We call e.preventDefault() to STOP the browser's native pixel-scale zoom
+    (which breaks Flutter canvas), and instead apply clean CSS body zoom.
+  -->
+  <script>
+    var _zoom = 1.0;
+    var _pinchStartDist = null;
+    var _pinchStartZoom = 1.0;
+
+    function applyZoom(newZoom) {
+      _zoom = Math.min(Math.max(newZoom, 0.5), 3.0);
+      document.body.style.zoom = _zoom;
+      // For Firefox (doesn't support CSS zoom): use transform instead
+      document.body.style.transform = '';
+    }
+
+    // ── Ctrl + Mouse Wheel / Trackpad Pinch (Chrome/Edge/Firefox) ──
+    // We capture this BEFORE Flutter, block native browser zoom (which distorts),
+    // and apply CSS body zoom instead (which makes Flutter re-render cleanly).
+    document.addEventListener('wheel', function (e) {
+      if (e.ctrlKey) {
+        e.preventDefault();          // block browser's pixel-scale zoom
+        e.stopImmediatePropagation(); // block Flutter from handling it
+        var delta = e.deltaY > 0 ? -0.1 : 0.1;
+        applyZoom(_zoom + delta);
+      }
+    }, { capture: true, passive: false });
+
+    // ── Two-finger pinch on touchscreen ──
+    document.addEventListener('touchstart', function (e) {
+      if (e.touches.length === 2) {
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        _pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+        _pinchStartZoom = _zoom;
+      }
+    }, { capture: true, passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+      if (e.touches.length === 2 && _pinchStartDist !== null) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        applyZoom(_pinchStartZoom * (dist / _pinchStartDist));
+      }
+    }, { capture: true, passive: false });
+
+    document.addEventListener('touchend', function (e) {
+      if (e.touches.length < 2) {
+        _pinchStartDist = null;
+      }
+    }, { capture: true, passive: true });
+
+    // ── Safari / iOS: gesturestart / gesturechange ──
+    document.addEventListener('gesturestart', function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, { capture: true, passive: false });
+    document.addEventListener('gesturechange', function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (typeof e.scale === 'number') {
+        applyZoom(_pinchStartZoom * e.scale);
+      }
+    }, { capture: true, passive: false });
+    document.addEventListener('gestureend', function (e) {
+      _pinchStartZoom = _zoom;
+    }, { capture: true, passive: false });
+  </script>
 </head>
 <body>
   <!--

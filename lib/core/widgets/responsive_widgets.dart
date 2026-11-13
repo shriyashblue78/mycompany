@@ -299,7 +299,11 @@ class ResponsiveScaffold extends StatelessWidget {
               width: AppSizes.drawerWidth,
               child: drawer,
             ),
-            const VerticalDivider(width: 1, thickness: 1),
+            const VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: Colors.transparent,
+            ),
             Expanded(
               child: Scaffold(
                 appBar: appBar != null ? _buildDesktopAppBar(context, appBar!) : null,

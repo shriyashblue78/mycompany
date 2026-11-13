@@ -48,6 +48,7 @@ import '../../features/notifications/presentation/screens/create_announcement_sc
 import '../../features/notifications/presentation/screens/announcement_history_screen.dart';
 import '../../features/super_admin/presentation/screens/super_admin_dashboard_screen.dart';
 import '../../features/super_admin/presentation/screens/super_admin_company_list_screen.dart';
+import '../../features/ai_assistant/presentation/screens/ai_chat_screen.dart';
 import '../../features/super_admin/presentation/screens/super_admin_company_detail_screen.dart';
 import '../../features/super_admin/presentation/screens/super_admin_create_company_screen.dart';
 import '../../features/super_admin/presentation/screens/super_admin_edit_company_screen.dart';
@@ -1373,6 +1374,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             amount: amount,
           );
         },
+      ),
+      GoRoute(
+        path: '/ai-chat',
+        name: 'ai_chat',
+        builder: (context, state) => const AiChatScreen(),
       ),
       GoRoute(
         path: '/dashboard',
