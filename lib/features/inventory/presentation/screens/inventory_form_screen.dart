@@ -11,10 +11,17 @@ import '../providers/inventory_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/widgets/polish_widgets.dart';
+import '../../../ai_assistant/presentation/widgets/ai_form_prefill_banner.dart';
 
 class InventoryFormScreen extends ConsumerStatefulWidget {
   final String? itemId;
-  const InventoryFormScreen({super.key, this.itemId});
+  final Map<String, dynamic>? initialValues;
+
+  const InventoryFormScreen({
+    super.key,
+    this.itemId,
+    this.initialValues,
+  });
 
   @override
   ConsumerState<InventoryFormScreen> createState() => _InventoryFormScreenState();
@@ -41,6 +48,46 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
   
   bool _saving = false;
   bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.itemId == null && widget.initialValues != null) {
+      _applyInitialValues(widget.initialValues!);
+    }
+  }
+
+  void _applyInitialValues(Map<String, dynamic> vals) {
+    if (vals['itemName'] != null) _nameController.text = vals['itemName'].toString();
+    if (vals['currentStock'] != null && vals['currentStock'].toString().trim().isNotEmpty) {
+      _currentStockController.text = vals['currentStock'].toString();
+    }
+    if (vals['supplierName'] != null) _supplierNameController.text = vals['supplierName'].toString();
+    if (vals['partNumber'] != null) _partNumberController.text = vals['partNumber'].toString();
+    if (vals['documentNumber'] != null) _documentNumberController.text = vals['documentNumber'].toString();
+    if (vals['process'] != null) _processController.text = vals['process'].toString();
+    if (vals['withMaterial'] != null) _withMaterial = vals['withMaterial'] == true;
+    if (vals['category'] != null) {
+      final rawCat = vals['category'].toString().trim();
+      final matchedCat = kInventoryCategories.firstWhere(
+        (c) => c.toLowerCase() == rawCat.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedCat.isNotEmpty) {
+        _category = matchedCat;
+      }
+    }
+    if (vals['unit'] != null) {
+      final rawUnit = vals['unit'].toString().trim();
+      final matchedUnit = kInventoryUnits.firstWhere(
+        (u) => u.toLowerCase() == rawUnit.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedUnit.isNotEmpty) {
+        _unit = matchedUnit;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -95,7 +142,9 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
           _partNumberController.text = item.partNumber;
           _processController.text = item.process;
           _withMaterial = item.withMaterial;
-          
+          if (widget.initialValues != null) {
+            _applyInitialValues(widget.initialValues!);
+          }
           _initialized = true;
  
           return _buildFormScaffold(theme, isEdit);
@@ -111,6 +160,11 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
   }
 
   Widget _buildFormScaffold(ThemeData theme, bool isEdit) {
+    final categories = kInventoryCategories.toSet().toList();
+    final units = kInventoryUnits.toSet().toList();
+    final validCategory = categories.contains(_category) ? _category : categories.first;
+    final validUnit = units.contains(_unit) ? _unit : units.first;
+
     return ResponsiveScaffold(
       appBar: AppBar(
         title: Text(isEdit ? 'Edit Inventory Item' : 'Add Inventory Item'),
@@ -132,6 +186,11 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (widget.initialValues != null && widget.initialValues!.isNotEmpty)
+                              AiFormPrefillBanner(
+                                prefilledFields: widget.initialValues!,
+                                isEdit: isEdit,
+                              ),
                             // Item Name
                             TextFormField(
                               controller: _nameController,
@@ -212,14 +271,14 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
                             ResponsiveFormRow(
                               children: [
                                 DropdownButtonFormField<String>(
-                                  value: _category,
+                                  value: validCategory,
                                   decoration: InputDecoration(
                                     labelText: 'Category *',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
                                   ),
-                                  items: kInventoryCategories.map((cat) {
+                                  items: categories.map((cat) {
                                     return DropdownMenuItem(value: cat, child: Text(cat));
                                   }).toList(),
                                   onChanged: (val) {
@@ -229,14 +288,14 @@ class _InventoryFormScreenState extends ConsumerState<InventoryFormScreen> {
                                   },
                                 ),
                                 DropdownButtonFormField<String>(
-                                  value: _unit,
+                                  value: validUnit,
                                   decoration: InputDecoration(
                                     labelText: 'Unit *',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
                                   ),
-                                  items: kInventoryUnits.map((u) {
+                                  items: units.map((u) {
                                     return DropdownMenuItem(value: u, child: Text(u));
                                   }).toList(),
                                   onChanged: (val) {

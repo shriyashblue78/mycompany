@@ -211,6 +211,24 @@ def resolve_navigation(destination: str, user_role: str) -> Tuple[bool, Dict[str
             "action": None,
         }
 
+    # Dynamic employee record route check: /employees/:id
+    emp_detail_match = re.match(r"^/employees/([a-zA-Z0-9_\-]+)$", destination.strip())
+    if emp_detail_match:
+        emp_id = emp_detail_match.group(1)
+        allowed_roles = {"Owner", "HR", "Supervisor"}
+        if user_role not in allowed_roles:
+            return False, {
+                "error": f"Access denied: Role '{user_role}' is not authorized to access employee records.",
+                "action": None,
+                "required_roles": list(allowed_roles),
+            }
+        return True, {
+            "action": "navigate",
+            "route": f"/employees/{emp_id}",
+            "title": f"Employee Record ({emp_id})",
+            "message": f"Navigating to Employee Record ({emp_id}).",
+        }
+
     matched_entry: Optional[Dict[str, Any]] = None
 
     # 1. Exact route path match

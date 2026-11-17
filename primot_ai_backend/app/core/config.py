@@ -20,6 +20,11 @@ class Settings:
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "512"))
     MAX_TOOL_CALLS_PER_TURN: int = int(os.getenv("MAX_TOOL_CALLS_PER_TURN", "3"))
 
+    # Context management configuration
+    MAX_HISTORY_TURNS: int = int(os.getenv("MAX_HISTORY_TURNS", "6"))
+    MAX_PROMPT_CHARS: int = int(os.getenv("MAX_PROMPT_CHARS", "14000"))
+    MAX_USER_MESSAGE_CHARS: int = int(os.getenv("MAX_USER_MESSAGE_CHARS", "2000"))
+
     # CORS configuration
     CORS_ORIGINS: List[str] = [
         o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()

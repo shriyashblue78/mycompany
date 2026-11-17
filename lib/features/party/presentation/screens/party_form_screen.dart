@@ -9,10 +9,17 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/constants/state_codes.dart';
 import '../../domain/models/party_model.dart';
 import '../providers/party_provider.dart';
+import '../../../ai_assistant/presentation/widgets/ai_form_prefill_banner.dart';
 
 class PartyFormScreen extends ConsumerStatefulWidget {
   final String? partyId;
-  const PartyFormScreen({super.key, this.partyId});
+  final Map<String, dynamic>? initialValues;
+
+  const PartyFormScreen({
+    super.key,
+    this.partyId,
+    this.initialValues,
+  });
 
   @override
   ConsumerState<PartyFormScreen> createState() => _PartyFormScreenState();
@@ -34,6 +41,62 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
   String? _selectedState;
   bool _saving = false;
   bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.partyId == null && widget.initialValues != null) {
+      _applyInitialValues(widget.initialValues!);
+    }
+  }
+
+  void _applyInitialValues(Map<String, dynamic> vals) {
+    if (vals['partyName'] != null) _partyNameController.text = vals['partyName'].toString();
+    final contactNum = vals['contactNumber'] ?? vals['contact_number'] ?? vals['phone'] ?? vals['mobile'];
+    if (contactNum != null) _contactNumberController.text = contactNum.toString();
+
+    final contactPerson = vals['contactPersonName'] ?? vals['contact_person_name'] ?? vals['contactPerson'] ?? vals['contact_person'];
+    if (contactPerson != null) _contactPersonNameController.text = contactPerson.toString();
+
+    if (vals['email'] != null) _emailController.text = vals['email'].toString();
+    if (vals['gstin'] != null) _gstinController.text = vals['gstin'].toString();
+    if (vals['address'] != null) _addressController.text = vals['address'].toString();
+
+    final vCode = vals['vendorCode'] ?? vals['vendor_code'];
+    if (vCode != null) {
+      final vCodeStr = vCode.toString().trim();
+      final phoneStr = _contactNumberController.text.trim();
+      final digits = vCodeStr.replaceAll(RegExp(r'\D'), '');
+      // Only populate if not a copied phone number
+      if (!(phoneStr.isNotEmpty && vCodeStr == phoneStr) && !(digits.length == 10 && digits == vCodeStr)) {
+        _vendorCodeController.text = vCodeStr;
+      }
+    }
+
+    final pTypeVal = vals['partyType'] ?? vals['party_type'];
+    if (pTypeVal != null) {
+      final pType = pTypeVal.toString().trim().toLowerCase();
+      if (pType == 'supplier' || pType == 'vendor') {
+        _partyType = 'Supplier';
+      } else {
+        _partyType = 'Customer';
+      }
+    }
+    if (vals['state'] != null && vals['state'].toString().isNotEmpty) {
+      final rawState = vals['state'].toString().trim();
+      final matchedState = kIndianStateCodes.keys.firstWhere(
+        (s) => s.toLowerCase() == rawState.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedState.isNotEmpty) {
+        _selectedState = matchedState;
+        _stateCodeController.text = getStateCode(matchedState);
+      } else {
+        _selectedState = null;
+        _stateCodeController.clear();
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -93,8 +156,18 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
           _contactPersonNameController.text = party.contactPersonName;
           _emailController.text = party.email;
           _gstinController.text = party.gstin;
-          _selectedState = party.state.isNotEmpty ? party.state : null;
-          _stateCodeController.text = party.stateCode.isNotEmpty ? party.stateCode : (party.state.isNotEmpty ? getStateCode(party.state) : '');
+          final rawPartyState = party.state.trim();
+          final matchedPartyState = kIndianStateCodes.keys.firstWhere(
+            (s) => s.toLowerCase() == rawPartyState.toLowerCase(),
+            orElse: () => '',
+          );
+          _selectedState = matchedPartyState.isNotEmpty ? matchedPartyState : null;
+          _stateCodeController.text = _selectedState != null
+              ? (party.stateCode.isNotEmpty ? party.stateCode : getStateCode(_selectedState!))
+              : '';
+          if (widget.initialValues != null) {
+            _applyInitialValues(widget.initialValues!);
+          }
           _initialized = true;
 
           return _buildFormScaffold(theme, isEdit);
@@ -111,7 +184,10 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
 
   Widget _buildFormScaffold(ThemeData theme, bool isEdit) {
     final titlePrefix = isEdit ? 'Edit' : 'Add';
-    final stateList = kIndianStateCodes.keys.toList()..sort();
+    final stateList = kIndianStateCodes.keys.toSet().toList()..sort();
+    final validSelectedState = (stateList.contains(_selectedState)) ? _selectedState : null;
+    const validPartyTypes = ['Customer', 'Supplier'];
+    final validPartyType = validPartyTypes.contains(_partyType) ? _partyType : 'Customer';
 
     return ResponsiveScaffold(
       appBar: AppBar(
@@ -134,6 +210,11 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (widget.initialValues != null && widget.initialValues!.isNotEmpty)
+                              AiFormPrefillBanner(
+                                prefilledFields: widget.initialValues!,
+                                isEdit: isEdit,
+                              ),
                             // Party Name & Party Type
                             ResponsiveFormRow(
                               children: [
@@ -153,7 +234,7 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
                                   },
                                 ),
                                 DropdownButtonFormField<String>(
-                                  value: _partyType,
+                                  value: validPartyType,
                                   isExpanded: true,
                                   decoration: InputDecoration(
                                     labelText: 'Party Type *',
@@ -161,10 +242,9 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
                                       borderRadius: BorderRadius.circular(AppSizes.inputRadius),
                                     ),
                                   ),
-                                  items: const [
-                                    DropdownMenuItem(value: 'Customer', child: Text('Customer', overflow: TextOverflow.ellipsis)),
-                                    DropdownMenuItem(value: 'Supplier', child: Text('Supplier', overflow: TextOverflow.ellipsis)),
-                                  ],
+                                  items: validPartyTypes.map((t) {
+                                    return DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis));
+                                  }).toList(),
                                   onChanged: (val) {
                                     if (val != null) {
                                       setState(() => _partyType = val);
@@ -249,7 +329,7 @@ class _PartyFormScreenState extends ConsumerState<PartyFormScreen> {
                                   ),
                                 ),
                                 DropdownButtonFormField<String>(
-                                  value: _selectedState,
+                                  value: validSelectedState,
                                   isExpanded: true,
                                   hint: const Text('Select State', overflow: TextOverflow.ellipsis),
                                   decoration: InputDecoration(

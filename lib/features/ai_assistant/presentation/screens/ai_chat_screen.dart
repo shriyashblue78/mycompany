@@ -120,6 +120,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                           onNavigate: (route) {
                             ref.read(routerProvider).go(route);
                           },
+                          onNavigateWithExtra: (route, extra) {
+                            ref.read(routerProvider).go(route, extra: extra);
+                          },
                         );
                       }
                       // Typing / thinking indicator

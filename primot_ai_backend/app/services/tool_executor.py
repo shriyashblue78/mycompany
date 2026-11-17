@@ -5,17 +5,23 @@ from typing import Any, Dict, Optional, Tuple
 
 from app.services.erp_tools import erp_tools_service
 from app.services.navigation import resolve_navigation
+from app.services.form_prefill import FormPrefillService
 
 logger = logging.getLogger(__name__)
 
 APPROVED_TOOL_NAMES = {
     "find_party",
+    "find_employee",
     "get_item",
     "get_stock",
     "sales_summary",
     "purchase_summary",
     "party_sales_total",
+    "compare_periods",
+    "party_insights",
+    "inventory_insights",
     "navigate_to_page",
+    "prepare_form",
 }
 
 
@@ -132,6 +138,13 @@ def execute_tool_call(
             res = erp_tools_service.find_party(company_id=company_id, query=query)
             return True, res.model_dump()
 
+        elif tool_name == "find_employee":
+            query = str(args.get("query") or args.get("q") or "").strip()
+            if not query:
+                return False, {"error": "Missing required argument 'query'."}
+            res = erp_tools_service.find_employee(company_id=company_id, query=query)
+            return True, res.model_dump()
+
         elif tool_name == "get_item":
             query = str(args.get("query") or args.get("q") or "").strip()
             if not query:
@@ -180,12 +193,67 @@ def execute_tool_call(
             )
             return True, res.model_dump()
 
+        elif tool_name == "compare_periods":
+            rep_type = str(args.get("report_type") or "sales").strip().lower()
+            p1_start = _parse_date_arg(args.get("period1_start"), is_end_date=False)
+            p1_end = _parse_date_arg(args.get("period1_end"), is_end_date=True)
+            p2_start = _parse_date_arg(args.get("period2_start"), is_end_date=False)
+            p2_end = _parse_date_arg(args.get("period2_end"), is_end_date=True)
+            p1_label = str(args.get("period1_label") or "Period 1")
+            p2_label = str(args.get("period2_label") or "Period 2")
+            res = erp_tools_service.compare_periods(
+                company_id=company_id,
+                report_type=rep_type,
+                period1_start=p1_start,
+                period1_end=p1_end,
+                period2_start=p2_start,
+                period2_end=p2_end,
+                period1_label=p1_label,
+                period2_label=p2_label,
+            )
+            return True, res.model_dump()
+
+        elif tool_name == "party_insights":
+            p_type = str(args.get("party_type") or "Customer").strip()
+            limit = int(args.get("limit") or 5)
+            res = erp_tools_service.party_insights(
+                company_id=company_id,
+                party_type=p_type,
+                limit=limit,
+            )
+            return True, res.model_dump()
+
+        elif tool_name == "inventory_insights":
+            res = erp_tools_service.inventory_insights(company_id=company_id)
+            return True, res.model_dump()
+
         elif tool_name == "navigate_to_page":
             dest = str(args.get("destination") or args.get("page") or args.get("module") or "").strip()
             if not dest:
                 return False, {"error": "Missing required argument 'destination'."}
             success, nav_res = resolve_navigation(destination=dest, user_role=user_role)
             return success, nav_res
+
+        elif tool_name == "prepare_form":
+            mod = str(args.get("module") or "").strip()
+            op = str(args.get("operation") or "create").strip()
+            target = args.get("target_record")
+            raw_f = args.get("fields") or {}
+            if not isinstance(raw_f, dict):
+                raw_f = {}
+
+            service = FormPrefillService()
+            res = service.process_form_request(
+                company_id=company_id,
+                user_role=user_role,
+                module=mod,
+                operation=op,
+                raw_fields=raw_f,
+                target_record=target,
+            )
+            if "error" in res:
+                return False, res
+            return True, res
 
         return False, {"error": f"Unhandled tool '{tool_name}'."}
 

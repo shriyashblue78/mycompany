@@ -18,11 +18,13 @@ class MockDelayedSuccessApiService extends PrimotAiApiService {
   final String simulatedReply;
   final String? simulatedNavRoute;
   final String? simulatedNavTitle;
+  final FormPrefillActionData? simulatedPrefillAction;
 
   MockDelayedSuccessApiService({
     this.simulatedReply = 'Recorded stock for ITM-001 is 120.0 Nos.',
     this.simulatedNavRoute,
     this.simulatedNavTitle,
+    this.simulatedPrefillAction,
   });
 
   @override
@@ -35,6 +37,7 @@ class MockDelayedSuccessApiService extends PrimotAiApiService {
       reply: simulatedReply,
       navigationRoute: simulatedNavRoute,
       navigationTitle: simulatedNavTitle,
+      prefillAction: simulatedPrefillAction,
     );
   }
 }
@@ -274,6 +277,144 @@ void main() {
       expect(closed, isTrue);
       expect(currentRoute, '/inventory');
       expect(find.text('Inventory Screen'), findsOneWidget);
+    });
+
+    testWidgets('ChatBubble renders FormPrefill review card with field chips and button', (tester) async {
+      final prefillAction = FormPrefillActionData(
+        actionType: 'prepare_form',
+        module: 'party',
+        operation: 'create',
+        route: '/parties/add',
+        moduleTitle: 'Party',
+        fields: {
+          'partyName': 'ABC Industries',
+          'contactNumber': '9876543210',
+        },
+        missingMandatoryFields: ['gstin'],
+      );
+
+      final message = ChatMessage(
+        id: 'msg_prefill_1',
+        text: 'I have prepared the party form for ABC Industries.',
+        sender: MessageSender.assistant,
+        status: MessageStatus.sent,
+        timestamp: DateTime.now(),
+        prefillAction: prefillAction,
+      );
+
+      String? navigatedRoute;
+      Map<String, dynamic>? navigatedExtra;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ChatBubble(
+              message: message,
+              onNavigateWithExtra: (route, extra) {
+                navigatedRoute = route;
+                navigatedExtra = extra;
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Review New Party'), findsOneWidget);
+      expect(find.text('partyName: ABC Industries'), findsOneWidget);
+      expect(find.text('contactNumber: 9876543210'), findsOneWidget);
+      expect(find.text('Missing Required Fields:'), findsOneWidget);
+      expect(find.text('gstin'), findsOneWidget);
+      expect(find.text('Complete Missing Fields in Form'), findsOneWidget);
+
+      await tester.tap(find.text('Complete Missing Fields in Form'));
+      await tester.pumpAndSettle();
+
+      expect(navigatedRoute, '/parties/add');
+      expect(navigatedExtra?['partyName'], 'ABC Industries');
+      expect(navigatedExtra?['contactNumber'], '9876543210');
+    });
+
+    testWidgets('CompactAiChatPanel form prefill review opens target form with extra fields', (tester) async {
+      String currentRoute = '/owner-dashboard';
+      Map<String, dynamic>? receivedExtra;
+      bool closed = false;
+
+      final prefillAction = FormPrefillActionData(
+        actionType: 'prepare_form',
+        module: 'inventory',
+        operation: 'create',
+        route: '/inventory/add',
+        moduleTitle: 'Inventory Item',
+        fields: {
+          'itemName': 'Copper Rod',
+          'unit': 'KG',
+          'minStock': 50.0,
+        },
+        missingMandatoryFields: <String>[],
+      );
+
+      final mockApi = MockDelayedSuccessApiService(
+        simulatedReply: 'I have prepared the item form for Copper Rod.',
+        simulatedPrefillAction: prefillAction,
+      );
+
+      final router = GoRouter(
+        initialLocation: '/owner-dashboard',
+        routes: [
+          GoRoute(
+            path: '/owner-dashboard',
+            builder: (context, state) {
+              currentRoute = '/owner-dashboard';
+              return Scaffold(
+                body: CompactAiChatPanel(
+                  onClose: () => closed = true,
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/inventory/add',
+            builder: (context, state) {
+              currentRoute = '/inventory/add';
+              receivedExtra = state.extra as Map<String, dynamic>?;
+              return const Scaffold(body: Text('Add Inventory Screen'));
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            primotAiApiServiceProvider.overrideWithValue(mockApi),
+            routerProvider.overrideWithValue(router),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      final textField = find.byType(TextField);
+      await tester.enterText(textField, 'Create an item called Copper Rod with unit KG and minimum stock 50');
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Review New Inventory Item'), findsOneWidget);
+      expect(find.text('itemName: Copper Rod'), findsOneWidget);
+      expect(find.text('Review & Save in Form'), findsOneWidget);
+
+      await tester.tap(find.text('Review & Save in Form'));
+      await tester.pumpAndSettle();
+
+      expect(closed, isTrue);
+      expect(currentRoute, '/inventory/add');
+      expect(receivedExtra?['itemName'], 'Copper Rod');
+      expect(receivedExtra?['unit'], 'KG');
+      expect(receivedExtra?['minStock'], 50.0);
+      expect(find.text('Add Inventory Screen'), findsOneWidget);
     });
 
     testWidgets('AiChatScreen full-screen chat navigates via GoRouter', (tester) async {

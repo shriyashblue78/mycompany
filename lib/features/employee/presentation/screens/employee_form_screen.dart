@@ -15,15 +15,18 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/employee_model.dart';
 import '../providers/employee_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../ai_assistant/presentation/widgets/ai_form_prefill_banner.dart';
 
 class EmployeeFormScreen extends ConsumerStatefulWidget {
   final String? employeeId;
   final EmployeeModel? employee;
+  final Map<String, dynamic>? initialValues;
 
   const EmployeeFormScreen({
     super.key,
     this.employeeId,
     this.employee,
+    this.initialValues,
   });
 
   @override
@@ -94,6 +97,49 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     } else {
       _generateUniqueId();
     }
+
+    if (widget.initialValues != null) {
+      _applyInitialValues(widget.initialValues!);
+    }
+  }
+
+  void _applyInitialValues(Map<String, dynamic> vals) {
+    if (vals['name'] != null) _nameController.text = vals['name'].toString();
+    if (vals['email'] != null) _emailController.text = vals['email'].toString();
+    if (vals['phone'] != null) _phoneController.text = vals['phone'].toString();
+    if (vals['designation'] != null) _designationController.text = vals['designation'].toString();
+    if (vals['department'] != null) {
+      final rawDept = vals['department'].toString().trim();
+      final matchedDept = kDepartments.firstWhere(
+        (d) => d.toLowerCase() == rawDept.toLowerCase(),
+        orElse: () => '',
+      );
+      _selectedDept = matchedDept.isNotEmpty ? matchedDept : null;
+    }
+    if (vals['role'] != null) {
+      final rawRole = vals['role'].toString().trim();
+      final allowedRoles = kRoles.where((r) => r != 'Owner').toList();
+      final matchedRole = allowedRoles.firstWhere(
+        (r) => r.toLowerCase() == rawRole.toLowerCase(),
+        orElse: () => '',
+      );
+      _selectedRole = matchedRole.isNotEmpty ? matchedRole : null;
+    }
+    if (vals['status'] != null) {
+      final rawStatus = vals['status'].toString().trim();
+      final matchedStatus = kStatuses.firstWhere(
+        (s) => s.toLowerCase() == rawStatus.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedStatus.isNotEmpty) {
+        _selectedStatus = matchedStatus;
+      }
+    }
+    if (vals['panCardNumber'] != null) _panCardController.text = vals['panCardNumber'].toString();
+    if (vals['aadhaarCardNumber'] != null) _aadhaarCardController.text = vals['aadhaarCardNumber'].toString();
+    if (vals['permanentAddress'] != null) _permanentAddressController.text = vals['permanentAddress'].toString();
+    if (vals['currentAddress'] != null) _currentAddressController.text = vals['currentAddress'].toString();
+    if (vals['alternatePhone'] != null) _alternatePhoneController.text = vals['alternatePhone'].toString();
   }
 
   void _prepopulateForm() {
@@ -421,6 +467,12 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSizes.p24),
+
+                      if (widget.initialValues != null && widget.initialValues!.isNotEmpty)
+                        AiFormPrefillBanner(
+                          prefilledFields: widget.initialValues!,
+                          isEdit: _isEditMode,
+                        ),
 
                       if (_formErrorMessage != null) ...[
                         Container(
@@ -757,19 +809,25 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Department *'),
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedDept,
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
-                                items: kDepartments.map((d) {
-                                  return DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 14)));
-                                }).toList(),
-                                validator: (val) => val == null ? 'Required' : null,
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedDept = val;
-                                  });
+                              Builder(
+                                builder: (context) {
+                                  final deptList = kDepartments.toSet().toList();
+                                  final validDept = deptList.contains(_selectedDept) ? _selectedDept : null;
+                                  return DropdownButtonFormField<String>(
+                                    value: validDept,
+                                    decoration: const InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    ),
+                                    items: deptList.map((d) {
+                                      return DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 14)));
+                                    }).toList(),
+                                    validator: (val) => val == null ? 'Required' : null,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _selectedDept = val;
+                                      });
+                                    },
+                                  );
                                 },
                               ),
                             ],
@@ -778,19 +836,25 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('System Role *'),
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedRole,
-                                decoration: const InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
-                                items: kRoles.where((r) => r != 'Owner').map((r) {
-                                  return DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 14)));
-                                }).toList(),
-                                validator: (val) => val == null ? 'Required' : null,
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedRole = val;
-                                  });
+                              Builder(
+                                builder: (context) {
+                                  final allowedRoles = kRoles.where((r) => r != 'Owner').toSet().toList();
+                                  final validRole = allowedRoles.contains(_selectedRole) ? _selectedRole : null;
+                                  return DropdownButtonFormField<String>(
+                                    value: validRole,
+                                    decoration: const InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    ),
+                                    items: allowedRoles.map((r) {
+                                      return DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 14)));
+                                    }).toList(),
+                                    validator: (val) => val == null ? 'Required' : null,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _selectedRole = val;
+                                      });
+                                    },
+                                  );
                                 },
                               ),
                             ],
@@ -914,20 +978,26 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
 
                       // Status (Toggle)
                       _buildLabel('Account Status'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedStatus,
-                        decoration: const InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        items: kStatuses.map((s) {
-                          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 14)));
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _selectedStatus = val;
-                            });
-                          }
+                      Builder(
+                        builder: (context) {
+                          final statusList = kStatuses.toSet().toList();
+                          final validStatus = statusList.contains(_selectedStatus) ? _selectedStatus : statusList.first;
+                          return DropdownButtonFormField<String>(
+                            value: validStatus,
+                            decoration: const InputDecoration(
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                            items: statusList.map((s) {
+                              return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 14)));
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedStatus = val;
+                                });
+                              }
+                            },
+                          );
                         },
                       ),
                       const SizedBox(height: AppSizes.p32),

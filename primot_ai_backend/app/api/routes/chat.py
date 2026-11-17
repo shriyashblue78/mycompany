@@ -1,7 +1,15 @@
 import logging
 from fastapi import APIRouter, Depends
 from app.core.auth import get_current_user
-from app.schemas.chat import AuthenticatedUser, ChatRequest, ChatResponse, NavigationAction
+from app.schemas.chat import (
+    AuthenticatedUser,
+    ChatRequest,
+    ChatResponse,
+    NavigationAction,
+    FormPrefillAction,
+    VisualReportAction,
+    WorkflowAction,
+)
 from app.services.chat_service import chat_service
 
 logger = logging.getLogger(__name__)
@@ -36,7 +44,19 @@ async def chat_endpoint(
     )
 
     action_dict = getattr(answer, "action", None)
-    action_obj = NavigationAction(**action_dict) if action_dict else None
+    action_obj = None
+    if action_dict:
+        action_type = action_dict.get("action")
+        if action_type == "navigate":
+            action_obj = NavigationAction(**action_dict)
+        elif action_type == "prefill_form":
+            action_obj = FormPrefillAction(**action_dict)
+        elif action_type == "business_report":
+            action_obj = VisualReportAction(**action_dict)
+        elif action_type == "workflow_automation":
+            action_obj = WorkflowAction(**action_dict)
+        else:
+            action_obj = action_dict
 
     return ChatResponse(
         reply=str(answer),

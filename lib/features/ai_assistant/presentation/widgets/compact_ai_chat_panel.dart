@@ -11,11 +11,13 @@ import '../widgets/suggested_question_chips.dart';
 class CompactAiChatPanel extends ConsumerStatefulWidget {
   final VoidCallback onClose;
   final ValueChanged<String>? onNavigate;
+  final void Function(String route, Map<String, dynamic>? extra)? onNavigateWithExtra;
 
   const CompactAiChatPanel({
     super.key,
     required this.onClose,
     this.onNavigate,
+    this.onNavigateWithExtra,
   });
 
   @override
@@ -37,13 +39,17 @@ class _CompactAiChatPanelState extends ConsumerState<CompactAiChatPanel> {
     });
   }
 
-  void _handleNavigation(String route) {
+  void _handleNavigation(String route, [Map<String, dynamic>? extra]) {
+    if (widget.onNavigateWithExtra != null) {
+      widget.onNavigateWithExtra!(route, extra);
+      return;
+    }
     if (widget.onNavigate != null) {
       widget.onNavigate!(route);
       return;
     }
     // Navigate directly using GoRouter from Riverpod without widget-tree context lookup
-    ref.read(routerProvider).go(route);
+    ref.read(routerProvider).go(route, extra: extra);
     widget.onClose();
   }
 
@@ -170,7 +176,8 @@ class _CompactAiChatPanelState extends ConsumerState<CompactAiChatPanel> {
                             return ChatBubble(
                               message: chatState.messages[index],
                               onRetry: () => chatNotifier.retryLastMessage(),
-                              onNavigate: _handleNavigation,
+                              onNavigate: (route) => _handleNavigation(route),
+                              onNavigateWithExtra: (route, extra) => _handleNavigation(route, extra),
                             );
                           }
                           return Padding(

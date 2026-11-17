@@ -142,9 +142,9 @@ class _FloatingAiAssistantWrapperState extends ConsumerState<FloatingAiAssistant
                     setState(() => _isPanelOpen = false);
                   }
                 },
-                onNavigate: (route) {
+                onNavigateWithExtra: (route, extra) {
                   // Navigate directly via GoRouter from Riverpod without context lookup
-                  ref.read(routerProvider).go(route);
+                  ref.read(routerProvider).push(route, extra: extra);
                   if (mounted) {
                     setState(() => _isPanelOpen = false);
                   }

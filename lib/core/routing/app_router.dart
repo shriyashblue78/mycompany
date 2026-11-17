@@ -701,7 +701,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/employees/add',
         name: 'employee_add',
-        builder: (context, state) => const EmployeeFormScreen(),
+        builder: (context, state) => EmployeeFormScreen(
+          initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+        ),
       ),
       GoRoute(
         path: '/employees/archived',
@@ -721,8 +723,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'employee_edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          final employee = state.extra as EmployeeModel?;
-          return EmployeeFormScreen(employeeId: id, employee: employee);
+          final employee = state.extra is EmployeeModel ? state.extra as EmployeeModel : null;
+          final initialValues = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+          return EmployeeFormScreen(
+            employeeId: id,
+            employee: employee,
+            initialValues: initialValues,
+          );
         },
       ),
       GoRoute(
@@ -979,14 +986,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inventory/add',
         name: 'inventory_add',
-        builder: (context, state) => const InventoryFormScreen(),
+        builder: (context, state) => InventoryFormScreen(
+          initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+        ),
       ),
       GoRoute(
         path: '/inventory/edit/:id',
         name: 'inventory_edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return InventoryFormScreen(itemId: id);
+          return InventoryFormScreen(
+            itemId: id,
+            initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+          );
         },
       ),
       GoRoute(
@@ -1013,14 +1025,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/purchase/add',
         name: 'purchase_add',
-        builder: (context, state) => const PurchaseFormScreen(),
+        builder: (context, state) => PurchaseFormScreen(
+          initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+        ),
       ),
       GoRoute(
         path: '/purchase/edit/:id',
         name: 'purchase_edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return PurchaseFormScreen(purchaseId: id);
+          return PurchaseFormScreen(
+            purchaseId: id,
+            initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+          );
         },
       ),
       GoRoute(
@@ -1039,14 +1056,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sales/add',
         name: 'sales_add',
-        builder: (context, state) => const SalesFormScreen(),
+        builder: (context, state) => SalesFormScreen(
+          initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+        ),
       ),
       GoRoute(
         path: '/sales/edit/:id',
         name: 'sales_edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return SalesFormScreen(saleId: id);
+          return SalesFormScreen(
+            saleId: id,
+            initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+          );
         },
       ),
       GoRoute(
@@ -1078,14 +1100,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/parties/add',
         name: 'party_add',
-        builder: (context, state) => const PartyFormScreen(),
+        builder: (context, state) => PartyFormScreen(
+          initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+        ),
       ),
       GoRoute(
         path: '/parties/edit/:id',
         name: 'party_edit',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return PartyFormScreen(partyId: id);
+          return PartyFormScreen(
+            partyId: id,
+            initialValues: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+          );
         },
       ),
       GoRoute(

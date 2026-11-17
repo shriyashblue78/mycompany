@@ -60,7 +60,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       status: MessageStatus.sent,
     );
 
-    // Extract prior conversation history for follow-up context retention
+    // Extract prior conversation history for follow-up context retention.
+    // Limit to the most recent 6 messages to optimize context window and payload size.
     final history = state.messages
         .where((m) =>
             m.status == MessageStatus.sent &&
@@ -70,6 +71,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
               'content': m.text,
             })
         .toList();
+    final recentHistory = history.length > 6 ? history.sublist(history.length - 6) : history;
 
     // Append user message & activate loading state
     state = state.copyWith(
@@ -81,7 +83,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       final response = await _apiService.sendMessage(
         message: cleanText,
-        history: history,
+        history: recentHistory,
       );
       final aiMsg = ChatMessage(
         id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
@@ -91,6 +93,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         status: MessageStatus.sent,
         navigationRoute: response.navigationRoute,
         navigationTitle: response.navigationTitle,
+        prefillAction: response.prefillAction,
+        reportAction: response.reportAction,
+        workflowAction: response.workflowAction,
       );
 
       state = state.copyWith(

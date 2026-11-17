@@ -349,6 +349,405 @@ class TestPhase3LocalLLMIntegration(unittest.TestCase):
         # ISO timestamp
         self.assertEqual(_parse_date_arg("2026-11-13T10:30:00Z"), date(2026, 11, 13))
 
+    def test_long_conversation_history_trimmed_to_recent(self):
+        """
+        Verify that in a long conversation, history is trimmed to recent turns,
+        avoiding context bloating while preserving the active user instructions.
+        """
+        from app.schemas.chat import ChatMessageItem
+
+        long_history = [
+            ChatMessageItem(role="user", content=f"User question turn {i}")
+            if i % 2 == 0
+            else ChatMessageItem(role="assistant", content=f"Assistant answer turn {i}")
+            for i in range(20)
+        ]
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[{"content": "Understood the latest instructions."}]
+        )
+        chat = ChatService(llm_provider=mock_provider)
+        import asyncio
+        reply = asyncio.run(
+            chat.process_chat(
+                user=self.user,
+                user_message="Summarize current stock of ITM-001",
+                history=long_history,
+            )
+        )
+
+        sent_messages = mock_provider.received_messages[0]
+        # System prompt + at most MAX_HISTORY_TURNS (6) + current user message = at most 8 messages
+        self.assertLessEqual(len(sent_messages), 8)
+        # Ensure the most recent history turn is preserved
+        self.assertEqual(sent_messages[-2]["content"], "Assistant answer turn 19")
+        # Ensure the current user message is always preserved as the final turn
+        self.assertEqual(sent_messages[-1]["content"], "Summarize current stock of ITM-001")
+        self.assertIn("Understood the latest instructions", reply)
+
+    def test_context_overflow_graceful_handling(self):
+        """
+        Verify that when a context overflow occurs from the model server,
+        Primot AI returns a clear, user-facing notice rather than crashing.
+        """
+        class OverflowLLMProvider(LLMProvider):
+            async def chat_completion(self, messages, tools=None, temperature=None, max_tokens=None):
+                raise LLMClientException("Context window exceeded maximum prompt limit of 2048 tokens")
+
+        chat = ChatService(llm_provider=OverflowLLMProvider())
+        import asyncio
+        reply = asyncio.run(chat.process_chat(self.user, "Check inventory"))
+
+        self.assertIn("exceeded the model's context limit", reply)
+        self.assertIn("clear the chat", reply)
+
+    def test_oversized_user_message_rejected_gracefully(self):
+        """
+        Verify that an excessively long user message that would overflow the context
+        is caught early with a helpful prompt to shorten it.
+        """
+        oversized_prompt = "Tell me everything about inventory " * 200  # > 6000 chars
+
+        mock_provider = MockLLMProvider()
+        chat = ChatService(llm_provider=mock_provider)
+        import asyncio
+        reply = asyncio.run(chat.process_chat(self.user, oversized_prompt))
+
+        self.assertIn("too long for Primot AI to process", reply)
+        self.assertIn("Please shorten", reply)
+        # Model should not even have been called
+        self.assertEqual(mock_provider.call_count, 0)
+
+    def test_dynamic_tool_filtering(self):
+        """
+        Verify that irrelevant tool schemas are filtered out for specific intents,
+        conserving context tokens.
+        """
+        from app.services.tool_definitions import filter_relevant_tools
+
+        stock_tools = filter_relevant_tools("What is the current stock of copper rod?")
+        tool_names = [t["function"]["name"] for t in stock_tools]
+        self.assertIn("get_stock", tool_names)
+        self.assertNotIn("navigate_to_page", tool_names)
+        self.assertNotIn("prepare_form", tool_names)
+
+        nav_tools = filter_relevant_tools("Open inventory")
+        nav_names = [t["function"]["name"] for t in nav_tools]
+        self.assertIn("navigate_to_page", nav_names)
+
+    def test_multistep_automation_workflow_composition(self):
+        """
+        Verify that when a user asks a multi-step ERP task, ChatService executes
+        the multiple tool calls and returns a structured WorkflowAction proposal
+        with approval gates instead of directly writing to the database.
+        """
+        mock_tool_call_1 = {
+            "id": "call_find",
+            "type": "function",
+            "function": {
+                "name": "find_party",
+                "arguments": json.dumps({"query": "Apex Steel"}),
+            },
+        }
+        mock_tool_call_2 = {
+            "id": "call_prefill",
+            "type": "function",
+            "function": {
+                "name": "prepare_form",
+                "arguments": json.dumps({
+                    "module": "purchases",
+                    "operation": "create",
+                    "fields": {"supplierName": "Apex Steel", "itemName": "Steel Plates", "quantity": 10},
+                }),
+            },
+        }
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[
+                {"content": None, "tool_calls": [mock_tool_call_1]},
+                {"content": None, "tool_calls": [mock_tool_call_2]},
+                {"content": "I located Apex Steel and prepared a purchase entry draft for Steel Plates."},
+            ]
+        )
+
+        with patch("app.services.tool_executor.erp_tools_service.find_party") as mock_find:
+            from app.schemas.erp_tools import FindPartyResult, PartySummary
+            mock_find.return_value = FindPartyResult(
+                matches=[PartySummary(party_id="P1", party_name="Apex Steel", party_type="Supplier", contact_number="9876543210")],
+                total_matches=1,
+                message="Found 1 matching party",
+            )
+
+            chat = ChatService(llm_provider=mock_provider)
+            import asyncio
+            reply = asyncio.run(
+                chat.process_chat(
+                    user=self.user,
+                    user_message="Find supplier Apex Steel and prepare a purchase entry for Steel Plates",
+                )
+            )
+
+            self.assertIn("Apex Steel", reply)
+            self.assertIsNotNone(reply.action)
+            self.assertEqual(reply.action["action"], "workflow_automation")
+            self.assertTrue(reply.action["requires_approval"])
+            self.assertGreaterEqual(len(reply.action["steps"]), 2)
+            self.assertEqual(reply.action["steps"][0]["title"], "Found Party: Apex Steel")
+            self.assertIn("Purchase", reply.action["steps"][1]["title"])
+
+    def test_multi_turn_purchase_draft_preserves_context_and_prioritizes_form(self):
+        """
+        Verify that in a multi-turn conversation where an item was checked in Turn 1,
+        a follow-up request in Turn 2 to 'Prepare a purchase entry for 50 KG from Apex Steel'
+        prioritizes prepare_form (NOT purchase_summary), preserves item context,
+        and generates the purchase draft action.
+        """
+        from app.schemas.chat import ChatMessageItem
+
+        history = [
+            ChatMessageItem(role="user", content="What is the current stock of Copper Rod?"),
+            ChatMessageItem(role="assistant", content="The current recorded stock for Copper Rod (ITM-001) is 10.0 KG, with minimum level 50.0 KG."),
+        ]
+
+        mock_tool_call = {
+            "id": "call_draft_purchase",
+            "type": "function",
+            "function": {
+                "name": "prepare_form",
+                "arguments": json.dumps({
+                    "module": "purchases",
+                    "operation": "create",
+                    "fields": {
+                        "supplierName": "Apex Steel",
+                        "itemName": "Copper Rod",
+                        "quantity": 50,
+                        "unit": "Kg",
+                    },
+                }),
+            },
+        }
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[
+                {"content": None, "tool_calls": [mock_tool_call]},
+                {"content": "I have prepared a purchase entry draft for 50 Kg of Copper Rod from Apex Steel. Missing required price - please complete before saving."},
+            ]
+        )
+
+        chat = ChatService(llm_provider=mock_provider)
+        import asyncio
+        reply = asyncio.run(
+            chat.process_chat(
+                user=self.user,
+                user_message="Prepare a purchase entry for 50 KG from Apex Steel",
+                history=history,
+            )
+        )
+
+        self.assertIn("Copper Rod", reply)
+        self.assertIsNotNone(reply.action)
+        # Verify it generates a form prefill action, NOT a summary report
+        self.assertEqual(reply.action["action"], "prefill_form")
+        self.assertEqual(reply.action["module"], "purchases")
+        self.assertEqual(reply.action["fields"]["supplierName"], "Apex Steel")
+        self.assertEqual(reply.action["fields"]["itemName"], "Copper Rod")
+        self.assertEqual(reply.action["fields"]["quantity"], 50)
+        self.assertIn("price", reply.action["missing_fields"])
+
+    def test_sales_draft_request_prioritizes_form_over_summary(self):
+        """
+        Verify that asking 'Create a sales entry for ABC Industries' prioritizes
+        prepare_form rather than sales_summary or party_sales_total.
+        """
+        from app.services.tool_definitions import filter_relevant_tools
+
+        tools = filter_relevant_tools("Create a sales entry for ABC Industries for 20 units of Bolt")
+        tool_names = [t["function"]["name"] for t in tools]
+
+        self.assertIn("prepare_form", tool_names)
+        self.assertNotIn("sales_summary", tool_names)
+        self.assertNotIn("party_sales_total", tool_names)
+
+    def test_multi_turn_sales_draft_preserves_customer_context(self):
+        """
+        Regression Test: When ABC Industries was identified in the conversation,
+        preserve it as the customer for subsequent sales draft requests.
+        Populate customerName correctly.
+        """
+        from app.schemas.chat import ChatMessageItem
+
+        history = [
+            ChatMessageItem(role="user", content="Find party ABC Industries"),
+            ChatMessageItem(role="assistant", content="Found 1 matching party: ABC Industries (Customer). Phone: 9876543210."),
+        ]
+
+        # Model emits tool call where customerName was omitted because user only said "for 20 units of Bolt at ₹50"
+        mock_tool_call = {
+            "id": "call_sales_draft",
+            "type": "function",
+            "function": {
+                "name": "prepare_form",
+                "arguments": json.dumps({
+                    "module": "sales",
+                    "operation": "create",
+                    "fields": {
+                        "itemName": "Bolt",
+                        "quantity": 20,
+                        "price": 50.0,
+                    },
+                }),
+            },
+        }
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[
+                {"content": None, "tool_calls": [mock_tool_call]},
+                {"content": "I have prepared a sales draft for 20 units of Bolt for ABC Industries at ₹50.00 each."},
+            ]
+        )
+
+        chat = ChatService(llm_provider=mock_provider)
+        import asyncio
+        reply = asyncio.run(
+            chat.process_chat(
+                user=self.user,
+                user_message="Prepare a sales draft for 20 units of Bolt at ₹50",
+                history=history,
+            )
+        )
+
+        self.assertIsNotNone(reply.action)
+        self.assertEqual(reply.action["action"], "prefill_form")
+        self.assertEqual(reply.action["module"], "sales")
+        # customerName MUST be preserved as ABC Industries
+        self.assertEqual(reply.action["fields"]["customerName"], "ABC Industries")
+        self.assertEqual(reply.action["fields"]["itemName"], "Bolt")
+        self.assertEqual(reply.action["fields"]["quantity"], 20)
+        self.assertEqual(reply.action["fields"]["price"], 50.0)
+        self.assertNotIn("customerName", reply.action.get("missing_fields", []))
+
+    def test_multi_turn_sales_draft_ambiguous_customer_leaves_missing(self):
+        """
+        Regression Test: When multiple conflicting parties were discussed,
+        do NOT guess; leave customerName missing and prompt for clarification.
+        """
+        from app.schemas.chat import ChatMessageItem
+
+        history = [
+            ChatMessageItem(role="user", content="Show details for party ABC Industries and party Omega Auto"),
+            ChatMessageItem(role="assistant", content="Found party ABC Industries and party Omega Auto."),
+        ]
+
+        # Model emits tool call without customerName
+        mock_tool_call = {
+            "id": "call_sales_draft_ambig",
+            "type": "function",
+            "function": {
+                "name": "prepare_form",
+                "arguments": json.dumps({
+                    "module": "sales",
+                    "operation": "create",
+                    "fields": {
+                        "itemName": "Bolt",
+                        "quantity": 20,
+                        "price": 50.0,
+                    },
+                }),
+            },
+        }
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[
+                {"content": None, "tool_calls": [mock_tool_call]},
+                {"content": "Which customer would you like to create this sales draft for: ABC Industries or Omega Auto?"},
+            ]
+        )
+
+        chat = ChatService(llm_provider=mock_provider)
+        import asyncio
+        reply = asyncio.run(
+            chat.process_chat(
+                user=self.user,
+                user_message="Prepare a sales draft for 20 units of Bolt at ₹50",
+                history=history,
+            )
+        )
+
+        self.assertIsNotNone(reply.action)
+        # customerName must not be guessed when ambiguous
+        self.assertIn("customerName", reply.action.get("missing_fields", []))
+
+    def test_find_employee_workflow_clean_schema_execution(self):
+        """
+        Regression Test: Employee lookup workflow execution.
+        Returns only actual employee fields, without party fields (vendorCode, GSTIN, contactPersonName).
+        """
+        mock_tool_call_1 = {
+            "id": "call_find_emp",
+            "type": "function",
+            "function": {
+                "name": "find_employee",
+                "arguments": json.dumps({"query": "Rahul Sharma"}),
+            },
+        }
+        mock_tool_call_2 = {
+            "id": "call_nav_emp",
+            "type": "function",
+            "function": {
+                "name": "navigate_to_page",
+                "arguments": json.dumps({"destination": "employees"}),
+            },
+        }
+
+        mock_provider = MockLLMProvider(
+            turns_sequence=[
+                {"content": None, "tool_calls": [mock_tool_call_1]},
+                {"content": None, "tool_calls": [mock_tool_call_2]},
+                {"content": "Found Rahul Sharma (Quality Engineer). Navigating to Employees screen."},
+            ]
+        )
+
+        with patch("app.services.tool_executor.erp_tools_service.find_employee") as mock_find_emp:
+            from app.schemas.erp_tools import FindEmployeeResult, EmployeeSummary
+            mock_find_emp.return_value = FindEmployeeResult(
+                matches=[
+                    EmployeeSummary(
+                        employee_id="EMP-101",
+                        name="Rahul Sharma",
+                        email="rahul@primot.erp",
+                        phone="9876543210",
+                        designation="Quality Engineer",
+                        department="Quality",
+                        role="Supervisor",
+                        status="Active",
+                    )
+                ],
+                total_matches=1,
+                message="Found 1 matching employee",
+            )
+
+            chat = ChatService(llm_provider=mock_provider)
+            import asyncio
+            reply = asyncio.run(
+                chat.process_chat(
+                    user=self.user,
+                    user_message="Find employee Rahul Sharma and open employees screen",
+                )
+            )
+
+            self.assertIsNotNone(reply.action)
+            self.assertEqual(reply.action["action"], "workflow_automation")
+            steps = reply.action["steps"]
+            self.assertEqual(len(steps), 2)
+            self.assertEqual(steps[0]["title"], "Found Employee: Rahul Sharma")
+            self.assertIn("Quality Engineer", steps[0]["description"])
+            # Verify payload does not have party fields
+            emp_payload = steps[0]["payload"]
+            self.assertNotIn("vendorCode", emp_payload)
+            self.assertNotIn("vendor_code", emp_payload)
+            self.assertNotIn("gstin", emp_payload)
+            self.assertNotIn("contactPersonName", emp_payload)
+
 
 if __name__ == "__main__":
     unittest.main()

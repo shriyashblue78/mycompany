@@ -12,13 +12,15 @@ import '../../../inventory/presentation/providers/inventory_provider.dart';
 import '../../domain/models/sale_model.dart';
 import '../providers/sales_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../ai_assistant/presentation/widgets/ai_form_prefill_banner.dart';
 
 import '../../../party/domain/models/party_model.dart';
 import '../../../party/presentation/providers/party_provider.dart';
 
 class SalesFormScreen extends ConsumerStatefulWidget {
   final String? saleId;
-  const SalesFormScreen({super.key, this.saleId});
+  final Map<String, dynamic>? initialValues;
+  const SalesFormScreen({super.key, this.saleId, this.initialValues});
 
   @override
   ConsumerState<SalesFormScreen> createState() => _SalesFormScreenState();
@@ -147,6 +149,36 @@ class _SalesFormScreenState extends ConsumerState<SalesFormScreen> {
     return 'INV-${(maxInvNum + 1).toString().padLeft(5, '0')}';
   }
 
+  void _applyInitialValues(Map<String, dynamic> vals) {
+    if (vals['customerName'] != null) {
+      _customerNameController.text = vals['customerName'].toString();
+      _partySearchController.text = vals['customerName'].toString();
+    }
+    if (vals['customerPhone'] != null) _customerPhoneController.text = vals['customerPhone'].toString();
+    if (vals['itemName'] != null) _nameController.text = vals['itemName'].toString();
+    if (vals['quantity'] != null && vals['quantity'].toString().trim().isNotEmpty) {
+      _quantityController.text = vals['quantity'].toString();
+    }
+    if (vals['price'] != null && vals['price'].toString().trim().isNotEmpty) {
+      _priceController.text = vals['price'].toString();
+    }
+    if (vals['remarks'] != null) _remarksController.text = vals['remarks'].toString();
+    if (vals['invoiceNumber'] != null) _invoiceNumberController.text = vals['invoiceNumber'].toString();
+    if (vals['unit'] != null) {
+      final rawUnit = vals['unit'].toString().trim();
+      final matchedUnit = kInventoryUnits.firstWhere(
+        (u) => u.toLowerCase() == rawUnit.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedUnit.isNotEmpty) {
+        _unit = matchedUnit;
+      }
+    }
+    if (vals['status'] != null) {
+      _status = vals['status'].toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -161,6 +193,9 @@ class _SalesFormScreenState extends ConsumerState<SalesFormScreen> {
     if (!isEdit && !_initialized) {
       final existingSales = ref.watch(companySalesStreamProvider).value ?? [];
       _invoiceNumberController.text = _generateUniqueInvoiceNumber(existingSales);
+      if (widget.initialValues != null) {
+        _applyInitialValues(widget.initialValues!);
+      }
       _initialized = true;
     }
 
@@ -203,6 +238,9 @@ class _SalesFormScreenState extends ConsumerState<SalesFormScreen> {
           _approvalStatus = sale.approvalStatus;
           _originalStatus = sale.status;
           _saleDate = sale.saleDate;
+          if (widget.initialValues != null) {
+            _applyInitialValues(widget.initialValues!);
+          }
           _initialized = true;
 
           return _buildFormScaffold(theme, isEdit, isReadOnly, isAccountant, isOwner);
@@ -245,6 +283,11 @@ class _SalesFormScreenState extends ConsumerState<SalesFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (widget.initialValues != null && widget.initialValues!.isNotEmpty)
+                              AiFormPrefillBanner(
+                                prefilledFields: widget.initialValues!,
+                                isEdit: isEdit,
+                              ),
                             if (isReadOnly)
                               Container(
                                 width: double.infinity,
@@ -565,25 +608,31 @@ class _SalesFormScreenState extends ConsumerState<SalesFormScreen> {
                             // Unit, Quantity & Price
                             ResponsiveFormRow(
                               children: [
-                                DropdownButtonFormField<String>(
-                                  value: _unit,
-                                  disabledHint: Text(_unit),
-                                  decoration: InputDecoration(
-                                    labelText: 'Unit *',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                                    ),
-                                  ),
-                                  items: kInventoryUnits.map((u) {
-                                    return DropdownMenuItem(value: u, child: Text(u));
-                                  }).toList(),
-                                  onChanged: isReadOnly
-                                      ? null
-                                      : (val) {
-                                          if (val != null) {
-                                            setState(() => _unit = val);
-                                          }
-                                        },
+                                Builder(
+                                  builder: (context) {
+                                    final unitList = kInventoryUnits.toSet().toList();
+                                    final validUnit = unitList.contains(_unit) ? _unit : unitList.first;
+                                    return DropdownButtonFormField<String>(
+                                      value: validUnit,
+                                      disabledHint: Text(validUnit),
+                                      decoration: InputDecoration(
+                                        labelText: 'Unit *',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                                        ),
+                                      ),
+                                      items: unitList.map((u) {
+                                        return DropdownMenuItem(value: u, child: Text(u));
+                                      }).toList(),
+                                      onChanged: isReadOnly
+                                          ? null
+                                          : (val) {
+                                              if (val != null) {
+                                                setState(() => _unit = val);
+                                              }
+                                            },
+                                    );
+                                  },
                                 ),
                                 TextFormField(
                                   controller: _quantityController,

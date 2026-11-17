@@ -253,6 +253,258 @@ class TestERPReadTools(unittest.TestCase):
         res_by_name = self.service.party_sales_total(self.company_a, "Omega Auto")
         self.assertEqual(res_by_name.total_billed_amount, 4000.0)
 
+    def test_compare_periods_sales(self):
+        """Verify sales date-range comparison calculates differences and trends correctly."""
+        # 3 sales documents
+        sales_docs = [
+            MockDocumentSnapshot(
+                "S1",
+                {"saleDate": "2026-10-10", "totalAmount": 1000.0, "status": "Delivered"},
+            ),
+            MockDocumentSnapshot(
+                "S2",
+                {"saleDate": "2026-11-05", "totalAmount": 2500.0, "status": "Pending"},
+            ),
+            MockDocumentSnapshot(
+                "S3",
+                {"saleDate": "2026-11-10", "totalAmount": 500.0, "status": "Cancelled"},  # Excluded
+            ),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = sales_docs
+
+        comp = self.service.compare_periods(
+            company_id=self.company_a,
+            report_type="sales",
+            period1_start=date(2026, 10, 1),
+            period1_end=date(2026, 10, 31),
+            period2_start=date(2026, 11, 1),
+            period2_end=date(2026, 11, 30),
+            period1_label="October",
+            period2_label="November",
+        )
+
+        self.assertEqual(comp.period_1.total_amount, 1000.0)
+        self.assertEqual(comp.period_2.total_amount, 2500.0)
+        self.assertEqual(comp.difference_amount, 1500.0)
+        self.assertEqual(comp.percentage_change, 150.0)
+        self.assertEqual(comp.trend, "up")
+
+    def test_party_insights_top_customers(self):
+        """Verify party insights ranks parties by volume and excludes cancelled sales."""
+        sales_docs = [
+            MockDocumentSnapshot(
+                "S1",
+                {"customerName": "Customer Alpha", "totalAmount": 5000.0, "status": "Delivered"},
+            ),
+            MockDocumentSnapshot(
+                "S2",
+                {"customerName": "Customer Beta", "totalAmount": 8000.0, "status": "Pending"},
+            ),
+            MockDocumentSnapshot(
+                "S3",
+                {"customerName": "Customer Alpha", "totalAmount": 2000.0, "status": "Approved"},
+            ),
+            MockDocumentSnapshot(
+                "S4",
+                {"customerName": "Customer Beta", "totalAmount": 9999.0, "status": "Cancelled"},  # Excluded
+            ),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = sales_docs
+
+        res = self.service.party_insights(company_id=self.company_a, party_type="Customer", limit=2)
+        self.assertEqual(len(res.parties), 2)
+        # Beta has 8000, Alpha has 5000 + 2000 = 7000
+        self.assertEqual(res.parties[0].party_name, "Customer Beta")
+        self.assertEqual(res.parties[0].total_amount, 8000.0)
+        self.assertEqual(res.parties[1].party_name, "Customer Alpha")
+        self.assertEqual(res.parties[1].total_amount, 7000.0)
+
+    def test_inventory_insights_low_stock_and_categories(self):
+        """Verify inventory insights calculates shortage against minimum level and category totals."""
+        inv_docs = [
+            MockDocumentSnapshot(
+                "I1",
+                {
+                    "itemNo": "ROD-01",
+                    "itemDescription": "Copper Rod",
+                    "category": "Raw Material",
+                    "currentStock": 20.0,
+                    "minimumLevel": 50.0,
+                    "stockUnit": "Kg",
+                },
+            ),
+            MockDocumentSnapshot(
+                "I2",
+                {
+                    "itemNo": "BOLT-01",
+                    "itemDescription": "Steel Bolt",
+                    "category": "Hardware",
+                    "currentStock": 100.0,
+                    "minimumLevel": 20.0,
+                    "stockUnit": "Nos",
+                },
+            ),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = inv_docs
+
+        insights = self.service.inventory_insights(company_id=self.company_a)
+        self.assertEqual(insights.total_items, 2)
+        self.assertEqual(insights.low_stock_count, 1)
+        self.assertEqual(insights.low_stock_items[0].item_number, "ROD-01")
+        self.assertEqual(insights.low_stock_items[0].shortage, 30.0)
+        self.assertIn("Raw Material", insights.category_summary)
+        self.assertEqual(insights.category_summary["Raw Material"]["total_stock"], 20.0)
+
+    def test_find_employee_schema_clean_and_no_party_fields(self):
+        """
+        Verify find_employee:
+        1. Returns only genuine Employee schema fields (no vendorCode, gstin, contactPersonName).
+        2. Excludes soft-deleted employees (isDeleted=True).
+        3. Limits each field to one occurrence without duplicated or fabricated data.
+        """
+        emp_docs = [
+            MockDocumentSnapshot(
+                "EMP01",
+                {
+                    "employeeId": "EMP01",
+                    "name": "Rahul Sharma",
+                    "email": "rahul.sharma@primot.erp",
+                    "phone": "9876543210",
+                    "designation": "Quality Engineer",
+                    "department": "Quality",
+                    "role": "Supervisor",
+                    "status": "Active",
+                    "isDeleted": False,
+                    # Erroneous Party fields if accidentally present in document must NOT leak
+                    "vendorCode": "VEN-999",
+                    "gstin": "27AAAAA0000A1Z5",
+                    "contactPersonName": "Should Not Exist",
+                },
+            ),
+            MockDocumentSnapshot(
+                "EMP02",
+                {
+                    "employeeId": "EMP02",
+                    "name": "Rahul Verma",
+                    "email": "rahul.verma@primot.erp",
+                    "phone": "9876500000",
+                    "designation": "Operator",
+                    "department": "Machining",
+                    "role": "Employee",
+                    "status": "Active",
+                    "isDeleted": True,  # Soft-deleted employee must be excluded
+                },
+            ),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = emp_docs
+
+        res = self.service.find_employee(company_id=self.company_a, query="Rahul")
+        self.assertEqual(res.total_matches, 1)
+        self.assertEqual(len(res.matches), 1)
+
+        emp = res.matches[0]
+        self.assertEqual(emp.employee_id, "EMP01")
+        self.assertEqual(emp.name, "Rahul Sharma")
+        self.assertEqual(emp.designation, "Quality Engineer")
+        self.assertEqual(emp.department, "Quality")
+        self.assertEqual(emp.role, "Supervisor")
+        self.assertEqual(emp.status, "Active")
+
+        # Crucial security & data integrity checks:
+        emp_dict = emp.model_dump()
+        self.assertNotIn("vendorCode", emp_dict)
+        self.assertNotIn("vendor_code", emp_dict)
+        self.assertNotIn("gstin", emp_dict)
+        self.assertNotIn("contactPersonName", emp_dict)
+        self.assertNotIn("contact_person", emp_dict)
+
+    def test_party_sales_total_preserves_transaction_statuses(self):
+        """
+        Verify party transaction history preserves exact Firestore values for
+        both delivery status ('status') and managerial approval ('approval_status')
+        without conflation.
+        """
+        sales_docs = [
+            MockDocumentSnapshot(
+                "S101",
+                {
+                    "saleNumber": "SO-2026-001",
+                    "customerName": "ABC Industries",
+                    "totalAmount": 15000.0,
+                    "status": "Pending",  # Voucher delivery status
+                    "approvalStatus": "Approved",  # Manager approval status
+                    "saleDate": "2026-11-10T10:00:00",
+                },
+            ),
+            MockDocumentSnapshot(
+                "S102",
+                {
+                    "saleNumber": "SO-2026-002",
+                    "customerName": "ABC Industries",
+                    "totalAmount": 25000.0,
+                    "status": "Delivered",  # Voucher delivery status
+                    "approvalStatus": "Pending Approval",  # Manager approval status
+                    "saleDate": "2026-11-12T11:00:00",
+                },
+            ),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = sales_docs
+
+        res = self.service.party_sales_total(company_id=self.company_a, party_identifier="ABC Industries")
+        self.assertEqual(res.sales_count, 2)
+        self.assertEqual(res.total_billed_amount, 40000.0)
+        self.assertEqual(len(res.recent_transactions), 2)
+
+        t1 = res.recent_transactions[0]
+        self.assertEqual(t1.reference_number, "SO-2026-001")
+        self.assertEqual(t1.status, "Pending")
+        self.assertEqual(t1.approval_status, "Approved")
+
+        t2 = res.recent_transactions[1]
+        self.assertEqual(t2.reference_number, "SO-2026-002")
+        self.assertEqual(t2.status, "Delivered")
+        self.assertEqual(t2.approval_status, "Pending Approval")
+
+    def test_sales_summary_distinguishes_delivery_and_approval_statuses(self):
+        """Verify delivery status (Pending/Delivered) and approval status (Approved/Pending Approval) are separate."""
+        sales_docs = [
+            # Delivery Pending, Approved
+            MockDocumentSnapshot("s1", {
+                "saleNumber": "SO-001",
+                "saleDate": "2026-11-01",
+                "customerName": "Customer A",
+                "totalAmount": 1000.0,
+                "status": "Pending",
+                "approvalStatus": "Approved",
+            }),
+            # Delivered, Pending Approval
+            MockDocumentSnapshot("s2", {
+                "saleNumber": "SO-002",
+                "saleDate": "2026-11-02",
+                "customerName": "Customer B",
+                "totalAmount": 2000.0,
+                "status": "Delivered",
+                "approvalStatus": "Pending Approval",
+            }),
+            # Delivered, Approved
+            MockDocumentSnapshot("s3", {
+                "saleNumber": "SO-003",
+                "saleDate": "2026-11-03",
+                "customerName": "Customer C",
+                "totalAmount": 3000.0,
+                "status": "Delivered",
+                "approvalStatus": "Approved",
+            }),
+        ]
+        self.mock_db.collection().document().collection().stream.return_value = sales_docs
+
+        res = self.service.sales_summary(company_id=self.company_a)
+        self.assertEqual(res.transaction_count, 3)
+        self.assertEqual(res.pending_delivery_count, 1)
+        self.assertEqual(res.completed_delivery_count, 2)
+        self.assertEqual(res.approved_count, 2)
+        self.assertEqual(res.pending_approval_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

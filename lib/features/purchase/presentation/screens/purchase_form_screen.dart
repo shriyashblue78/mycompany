@@ -12,10 +12,12 @@ import '../../../inventory/presentation/providers/inventory_provider.dart';
 import '../../domain/models/purchase_model.dart';
 import '../providers/purchase_provider.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../../ai_assistant/presentation/widgets/ai_form_prefill_banner.dart';
 
 class PurchaseFormScreen extends ConsumerStatefulWidget {
   final String? purchaseId;
-  const PurchaseFormScreen({super.key, this.purchaseId});
+  final Map<String, dynamic>? initialValues;
+  const PurchaseFormScreen({super.key, this.purchaseId, this.initialValues});
 
   @override
   ConsumerState<PurchaseFormScreen> createState() => _PurchaseFormScreenState();
@@ -71,6 +73,41 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
     return qty * price;
   }
 
+  void _applyInitialValues(Map<String, dynamic> vals) {
+    if (vals['supplierName'] != null) _supplierNameController.text = vals['supplierName'].toString();
+    if (vals['supplierPhone'] != null) _supplierPhoneController.text = vals['supplierPhone'].toString();
+    if (vals['itemName'] != null) _nameController.text = vals['itemName'].toString();
+    if (vals['quantity'] != null && vals['quantity'].toString().trim().isNotEmpty) {
+      _quantityController.text = vals['quantity'].toString();
+    }
+    if (vals['price'] != null && vals['price'].toString().trim().isNotEmpty) {
+      _priceController.text = vals['price'].toString();
+    }
+    if (vals['remarks'] != null) _remarksController.text = vals['remarks'].toString();
+    if (vals['invoiceNumber'] != null) _invoiceNumberController.text = vals['invoiceNumber'].toString();
+    if (vals['unit'] != null) {
+      final rawUnit = vals['unit'].toString().trim();
+      final matchedUnit = kInventoryUnits.firstWhere(
+        (u) => u.toLowerCase() == rawUnit.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedUnit.isNotEmpty) {
+        _unit = matchedUnit;
+      }
+    }
+    if (vals['status'] != null) {
+      const validStatuses = ['Pending', 'Received', 'Cancelled'];
+      final rawStatus = vals['status'].toString().trim();
+      final matchedStatus = validStatuses.firstWhere(
+        (s) => s.toLowerCase() == rawStatus.toLowerCase(),
+        orElse: () => '',
+      );
+      if (matchedStatus.isNotEmpty) {
+        _status = matchedStatus;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -81,6 +118,13 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
     final isReadOnly = role != 'Owner' && role != 'Accountant';
     final isAccountant = role == 'Accountant';
     final isOwner = role == 'Owner';
+
+    if (!isEdit && !_initialized) {
+      if (widget.initialValues != null) {
+        _applyInitialValues(widget.initialValues!);
+      }
+      _initialized = true;
+    }
 
     if (isEdit && !_initialized) {
       final purchaseDetailsAsync = ref.watch(purchaseDetailsStreamProvider(widget.purchaseId!));
@@ -105,6 +149,9 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
           _approvalStatus = purchase.approvalStatus;
           _originalStatus = purchase.status;
           _purchaseDate = purchase.purchaseDate;
+          if (widget.initialValues != null) {
+            _applyInitialValues(widget.initialValues!);
+          }
           _initialized = true;
 
           return _buildFormScaffold(theme, isEdit, isReadOnly, isAccountant, isOwner);
@@ -147,6 +194,11 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (widget.initialValues != null && widget.initialValues!.isNotEmpty)
+                              AiFormPrefillBanner(
+                                prefilledFields: widget.initialValues!,
+                                isEdit: isEdit,
+                              ),
                             if (isReadOnly)
                               Container(
                                 width: double.infinity,
@@ -333,25 +385,31 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                     },
                                   ),
                                 ),
-                                DropdownButtonFormField<String>(
-                                  value: _unit,
-                                  disabledHint: Text(_unit),
-                                  decoration: InputDecoration(
-                                    labelText: 'Unit *',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                                    ),
-                                  ),
-                                  items: kInventoryUnits.map((u) {
-                                    return DropdownMenuItem(value: u, child: Text(u));
-                                  }).toList(),
-                                  onChanged: isReadOnly
-                                      ? null
-                                      : (val) {
-                                          if (val != null) {
-                                            setState(() => _unit = val);
-                                          }
-                                        },
+                                Builder(
+                                  builder: (context) {
+                                    final unitList = kInventoryUnits.toSet().toList();
+                                    final validUnit = unitList.contains(_unit) ? _unit : unitList.first;
+                                    return DropdownButtonFormField<String>(
+                                      value: validUnit,
+                                      disabledHint: Text(validUnit),
+                                      decoration: InputDecoration(
+                                        labelText: 'Unit *',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                                        ),
+                                      ),
+                                      items: unitList.map((u) {
+                                        return DropdownMenuItem(value: u, child: Text(u));
+                                      }).toList(),
+                                      onChanged: isReadOnly
+                                          ? null
+                                          : (val) {
+                                              if (val != null) {
+                                                setState(() => _unit = val);
+                                              }
+                                            },
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -454,27 +512,31 @@ class _PurchaseFormScreenState extends ConsumerState<PurchaseFormScreen> {
                                     ),
                                   ),
                                 ),
-                                DropdownButtonFormField<String>(
-                                  value: _status,
-                                  disabledHint: Text(_status),
-                                  decoration: InputDecoration(
-                                    labelText: 'Status *',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppSizes.inputRadius),
-                                    ),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                                    DropdownMenuItem(value: 'Received', child: Text('Received')),
-                                    DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
-                                  ],
-                                  onChanged: isReadOnly
-                                      ? null
-                                      : (val) {
-                                          if (val != null) {
-                                            setState(() => _status = val);
-                                          }
-                                        },
+                                Builder(
+                                  builder: (context) {
+                                    const validStatuses = ['Pending', 'Received', 'Cancelled'];
+                                    final validStatus = validStatuses.contains(_status) ? _status : 'Pending';
+                                    return DropdownButtonFormField<String>(
+                                      value: validStatus,
+                                      disabledHint: Text(validStatus),
+                                      decoration: InputDecoration(
+                                        labelText: 'Status *',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(AppSizes.inputRadius),
+                                        ),
+                                      ),
+                                      items: validStatuses.map((s) {
+                                        return DropdownMenuItem(value: s, child: Text(s));
+                                      }).toList(),
+                                      onChanged: isReadOnly
+                                          ? null
+                                          : (val) {
+                                              if (val != null) {
+                                                setState(() => _status = val);
+                                              }
+                                            },
+                                    );
+                                  },
                                 ),
                               ],
                             ),
