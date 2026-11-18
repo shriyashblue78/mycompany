@@ -92,14 +92,8 @@ class MyApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) => AppLockWrapper(
         child: GlobalKeyboardNavigationWrapper(
-          child: Overlay(
-            initialEntries: [
-              OverlayEntry(
-                builder: (context) => FloatingAiAssistantWrapper(
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              ),
-            ],
+          child: FloatingAiAssistantWrapper(
+            child: child ?? const SizedBox.shrink(),
           ),
         ),
       ),

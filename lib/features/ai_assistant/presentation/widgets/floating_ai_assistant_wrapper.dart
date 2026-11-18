@@ -24,9 +24,42 @@ class FloatingAiAssistantWrapper extends ConsumerStatefulWidget {
 
 class _FloatingAiAssistantWrapperState extends ConsumerState<FloatingAiAssistantWrapper> {
   bool _isPanelOpen = false;
+  GoRouter? _observedRouter;
+
+  void _onRouteChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _attachRouterListener(GoRouter router) {
+    if (_observedRouter != router) {
+      _observedRouter?.routerDelegate.removeListener(_onRouteChanged);
+      _observedRouter?.routeInformationProvider?.removeListener(_onRouteChanged);
+      _observedRouter = router;
+      _observedRouter?.routerDelegate.addListener(_onRouteChanged);
+      _observedRouter?.routeInformationProvider?.addListener(_onRouteChanged);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final router = ref.read(routerProvider);
+      _attachRouterListener(router);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _observedRouter?.routerDelegate.removeListener(_onRouteChanged);
+    _observedRouter?.routeInformationProvider?.removeListener(_onRouteChanged);
+    super.dispose();
+  }
 
   bool _isRouteExcluded(String? path) {
-    if (path == null) return false;
+    if (path == null || path.isEmpty) return false;
     // Exclude unauthenticated or blocking screens
     return path.startsWith('/login') ||
         path.startsWith('/splash') ||
@@ -40,16 +73,22 @@ class _FloatingAiAssistantWrapperState extends ConsumerState<FloatingAiAssistant
     final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Determine current route path safely
+    // Determine current route path safely and ensure listener attached
     String? currentPath;
     try {
       final router = ref.watch(routerProvider);
-      currentPath = router.routeInformationProvider.value.uri.path;
+      _attachRouterListener(router);
+      currentPath = router.routerDelegate.currentConfiguration.uri.path;
     } catch (_) {
       try {
-        currentPath = GoRouterState.of(context).uri.path;
+        final router = ref.read(routerProvider);
+        currentPath = router.routeInformationProvider?.value.uri.path;
       } catch (_) {
-        currentPath = null;
+        try {
+          currentPath = GoRouterState.of(context).uri.path;
+        } catch (_) {
+          currentPath = null;
+        }
       }
     }
 
